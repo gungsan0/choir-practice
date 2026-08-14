@@ -563,4 +563,23 @@ $('pub').onclick = async () => {
   btn.disabled = false;
 };
 
+/* 기존 곡 다시 만들기 — 같은 아이디로 저장하면 덮어써집니다 */
+(async () => {
+  const id = new URLSearchParams(location.search).get('redo');
+  if (!id) return;
+  let info = null;
+  try { info = await (await fetch('songs/' + id + '/song.json')).json(); } catch (e) { }
+  if (!info) { try { info = (JSON.parse(localStorage.getItem('localSongs') || '[]')).find(s => s.id === id); } catch (e) { } }
+  if (!info) return;
+  $('title').value = info.title || id;
+  $('subtitle').value = info.subtitle || '';
+  $('sid').value = id;
+  $('order').value = (info.parts || []).map(p => p.id || p).join(',');
+  $('title').oninput = null;                       // 아이디가 바뀌지 않도록 고정
+  const note = document.createElement('p');
+  note.className = 'dim';
+  note.innerHTML = `<b>「${info.title || id}」 다시 만들기</b> — 같은 파일을 다시 올리고 분석한 뒤 저장하면 이 곡을 덮어씁니다. 아이디(${id})는 그대로 두세요.`;
+  $('s2').hidden = false; $('s2').appendChild(note);
+})();
+
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });

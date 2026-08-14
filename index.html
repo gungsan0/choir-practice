@@ -65,7 +65,8 @@ function render(){
       `<div class="chips">${chips}
         ${s.local?'<span class="saved">● 이 기기에 추가함</span>':(cached.has(s.id)?'<span class="saved">● 오프라인 저장됨</span>':'')}
         <span class="meta">${s.measures?s.measures+'마디 · ':''}${s.pages?s.pages+'쪽 · ':''}${s.duration?fmt(s.duration):''}</span>
-        ${s.local?`<button class="del" title="이 기기에서 삭제" data-del="${s.id}">×</button>`:''}
+        <button class="del" data-fix="${s.id}" title="악보 인식을 다시 해서 이 곡을 덮어씁니다">다시 만들기</button>
+        <button class="del danger" data-del="${s.id}" title="${s.local?'이 기기에서 삭제':'모두에게서 삭제 (GitHub)'}">삭제</button>
       </div>`;
     list.appendChild(a);
   });
@@ -90,14 +91,75 @@ function render(){
     '휴대폰에서는 공유 → 홈 화면에 추가하면 앱처럼 열립니다.';
 })();
 document.getElementById('q').addEventListener('input',render);
+/* ── 곡 삭제 / 다시 만들기 ─────────────────────────── */
+const ghCfg = () => { try{ return JSON.parse(localStorage.getItem('gh')||'{}'); }catch(e){ return {}; } };
+async function ghApi(path, opt={}){
+  const c=ghCfg();
+  const r=await fetch('https://api.github.com/repos/'+c.repo+path, {...opt,
+    headers:{Authorization:'Bearer '+c.token, Accept:'application/vnd.github+json', ...(opt.headers||{})}});
+  if(r.status===404) return null;
+  if(!r.ok) throw new Error('GitHub '+r.status+' — '+(await r.text()).slice(0,140));
+  return r.json();
+}
+async function removeLocal(id){
+  try{ await caches.delete('songs-'+id); }catch(e){}
+  localStorage.setItem('localSongs', JSON.stringify(
+    JSON.parse(localStorage.getItem('localSongs')||'[]').filter(s=>s.id!==id)));
+}
+async function removePublished(id, say){
+  const c=ghCfg();
+  if(!c.repo||!c.token){
+    alert('공개된 곡을 지우려면 GitHub 연결이 필요합니다.\n＋ 곡 추가 → GitHub 연결 설정에서 저장소와 토큰을 먼저 입력해주세요.');
+    location.href='add.html'; return false;
+  }
+  const branch=c.branch||'main';
+  const files=await ghApi('/contents/songs/'+id+'?ref='+branch);
+  if(Array.isArray(files)){
+    let i=0;
+    for(const f of files){
+      say(`삭제 중… (${++i}/${files.length}) ${f.name}`);
+      await ghApi('/contents/'+f.path, {method:'DELETE',
+        body:JSON.stringify({message:'remove '+f.path, sha:f.sha, branch})});
+    }
+  }
+  say('곡 목록 갱신 중…');
+  const cur=await ghApi('/contents/songs/index.json?ref='+branch);
+  if(cur&&cur.content){
+    let idx={songs:[]};
+    try{ idx=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(cur.content.replace(/\n/g,'')),ch=>ch.charCodeAt(0)))); }catch(e){}
+    idx.songs=(idx.songs||[]).filter(s=>s.id!==id);
+    const body=btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(idx,null,2))));
+    await ghApi('/contents/songs/index.json', {method:'PUT',
+      body:JSON.stringify({message:'remove '+id+' from list', content:body, sha:cur.sha, branch})});
+  }
+  await removeLocal(id);
+  return true;
+}
 document.getElementById('list').addEventListener('click', async e=>{
-  const b=e.target.closest('[data-del]'); if(!b) return;
+  const fix=e.target.closest('[data-fix]'), del=e.target.closest('[data-del]');
+  if(!fix&&!del) return;
   e.preventDefault(); e.stopPropagation();
-  const id=b.dataset.del;
-  if(!confirm('이 기기에서 이 곡을 삭제할까요? (앱에 공개된 곡은 지워지지 않습니다)')) return;
-  try{ await caches.delete('songs-'+id); }catch(err){}
-  localStorage.setItem('localSongs', JSON.stringify(JSON.parse(localStorage.getItem('localSongs')||'[]').filter(s=>s.id!==id)));
-  songs=songs.filter(s=>s.id!==id); render();
+
+  if(fix){
+    sessionStorage.setItem('redoSong', fix.dataset.fix);
+    location.href='add.html?redo='+encodeURIComponent(fix.dataset.fix);
+    return;
+  }
+
+  const id=del.dataset.del, s=songs.find(x=>x.id===id)||{};
+  const say=t=>{ del.textContent=t; };
+  if(s.local){
+    if(!confirm(`"${s.title}" 을(를) 이 기기에서 삭제할까요?`)) return;
+    await removeLocal(id);
+  }else{
+    if(!confirm(`"${s.title}" 을(를) GitHub에서 완전히 삭제할까요?\n모든 사람의 목록에서 사라집니다. (1~2분 뒤 반영)`)) return;
+    del.disabled=true;
+    try{ if(!await removePublished(id, say)) return; }
+    catch(err){ alert('삭제 실패: '+err.message); del.disabled=false; del.textContent='삭제'; return; }
+  }
+  songs=songs.filter(x=>x.id!==id);
+  cached.delete(id);
+  render();
 });
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>

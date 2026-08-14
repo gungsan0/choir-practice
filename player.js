@@ -211,6 +211,12 @@
     $('bar').oninput = () => { setT($('bar').value / 1000 * dur()); render(true); };
     $('clr').onclick = () => { loopA = loopB = null; lmk.remove(); $('lp').textContent = ''; };
     $('dl').onclick = saveOffline;
+    $('rf').onclick = async () => {
+      if (isLocal()) { alert('이 곡은 이 기기에서 추가한 곡이라 다시 받을 원본이 없습니다.\n곡 목록에서 “다시 만들기”를 눌러주세요.'); return; }
+      if (!confirm('이 곡의 악보·음원을 최신으로 다시 받을까요?')) return;
+      try { await caches.delete('songs-' + songId); } catch (e) { }
+      location.reload();
+    };
     addEventListener('resize', fit);
     addEventListener('keydown', e => {
       if (e.target.tagName === 'INPUT') return;

@@ -1,5 +1,5 @@
 /* 울림 합창 연습실 — 오프라인 지원 */
-const SHELL = 'shell-v3';
+const SHELL = 'shell-v4';
 const FILES = ['./', 'index.html', 'player.html', 'player.js', 'app.css',
   'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable.png', 'logo-badge.png',
   'add.html', 'add.js', 'vendor/fflate.min.js', 'vendor/pdf.min.mjs', 'vendor/pdf.worker.min.mjs'];
@@ -60,12 +60,12 @@ self.addEventListener('fetch', e => {
 
   if (url.pathname.endsWith('.mp3')) { e.respondWith(audio(req, url)); return; }
 
-  // 곡 목록은 최신을 먼저 시도(새 곡이 바로 보이도록), 실패하면 캐시
-  if (url.pathname.endsWith('songs/index.json')) {
+  // 곡 목록과 곡 정보는 최신을 먼저 시도(새 곡·고친 악보가 바로 보이도록), 실패하면 캐시
+  if (url.pathname.endsWith('songs/index.json') || url.pathname.endsWith('song.json')) {
     e.respondWith(
       fetch(req).then(r => {
         const cp = r.clone();
-        caches.open(SHELL).then(c => c.put(req, cp)).catch(() => { });
+        caches.open(cacheNameFor(url)).then(c => c.put(req, cp)).catch(() => { });
         return r;
       }).catch(() => caches.match(req))
     );
