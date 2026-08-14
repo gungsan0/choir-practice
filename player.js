@@ -130,6 +130,7 @@
     addEventListener('load', () => setTimeout(() => parts.slice(1).forEach(p => fetch(base + p.id + '.mp3').catch(() => { })), 2000));
 
     wire(); fit(); render(true);
+    if (isLocal()) { $('dl').textContent = '✓ 이 기기에 저장됨'; $('dl').classList.add('act'); }
     (function loop() { render(false); requestAnimationFrame(loop); })();
   }
 
@@ -220,9 +221,14 @@
     paintParts();
   }
 
+  function isLocal() {
+    try { return JSON.parse(localStorage.getItem('localSongs') || '[]').some(s => s.id === songId); }
+    catch (e) { return false; }
+  }
   async function saveOffline() {
     const btn = $('dl');
     if (!('caches' in window)) { btn.textContent = '이 브라우저는 미지원'; return; }
+    if (isLocal()) { btn.textContent = '✓ 이 기기에 저장됨'; btn.classList.add('act'); return; }
     btn.disabled = true; btn.textContent = '저장 중…';
     try {
       const urls = [base + 'song.json', 'player.html', 'player.js', 'app.css', 'index.html']

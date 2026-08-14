@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>곡 추가 — 울림 합창 연습실</title>
+<meta name="theme-color" content="#15181d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="top"><div class="inner"><div class="brand">
+  <img src="logo-badge.png" width="46" height="46" alt="">
+  <div><h1>곡 추가</h1><p>악보 PDF와 파트별 음원을 올리면 앱이 알아서 마디를 찾아 맞춰줍니다</p></div>
+  <a href="index.html" class="btn ghost" style="margin-left:auto">곡 목록</a>
+</div></div></div>
+
+<div class="wrap">
+
+  <!-- 1. 파일 -->
+  <section class="box">
+    <h3><span class="num">1</span> 파일 올리기</h3>
+    <div id="drop" class="drop">
+      <p><b>여기로 파일을 끌어다 놓거나</b> 눌러서 선택하세요</p>
+      <p class="dim">악보 PDF 1개 · 파트별 음원(파일명에 <code>[파트이름]</code>) · MuseScore 파일(.mscz, 선택)</p>
+      <input id="files" type="file" multiple accept=".pdf,.mscz,.mscx,audio/*" hidden>
+    </div>
+    <div id="filelist" class="files"></div>
+  </section>
+
+  <!-- 2. 정보 -->
+  <section class="box" id="s2" hidden>
+    <h3><span class="num">2</span> 곡 정보</h3>
+    <div class="grid">
+      <label>곡 제목<input id="title" type="text" placeholder="예) When You Believe"></label>
+      <label>부제 <span class="dim">(선택)</span><input id="subtitle" type="text" placeholder="예) 울림 어린이합창단"></label>
+      <label>주소용 아이디<input id="sid" type="text" placeholder="when-you-believe"></label>
+      <label>파트 순서 <span class="dim">(악보 위 → 아래)</span><input id="order" type="text" placeholder="Children,Mum,Dad"></label>
+    </div>
+  </section>
+
+  <!-- 3. 분석 -->
+  <section class="box" id="s3" hidden>
+    <h3><span class="num">3</span> 악보 분석</h3>
+    <div class="row2">
+      <button class="go" id="analyze">분석 시작</button>
+      <span class="dim" id="prog"></span>
+    </div>
+    <div id="result" hidden>
+      <div class="stats" id="stats"></div>
+      <div class="grid">
+        <label>한 단의 오선 수 <span class="dim">(자동)</span><input id="sps" type="number" min="1" max="8" placeholder="자동"></label>
+        <label>첫 구간 BPM<input id="bpm" type="number" step="0.25" min="20" max="240"></label>
+        <label>1마디 시작 시각(초)<input id="off" type="number" step="0.01"></label>
+        <label>&nbsp;<button class="btn wide" id="redo">이 값으로 다시 계산</button></label>
+      </div>
+      <p class="dim">아래 미리보기에서 마디 상자가 실제 마디와 맞는지, 재생 위치가 악보와 맞는지 확인해주세요.</p>
+      <div id="preview" class="preview"></div>
+      <div class="row2">
+        <button class="btn" id="ptest">▶ 30초 들으며 확인</button>
+        <span class="dim" id="ptxt"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. 저장 -->
+  <section class="box" id="s4" hidden>
+    <h3><span class="num">4</span> 저장</h3>
+    <div class="row2">
+      <button class="go" id="save">이 기기에 저장</button>
+      <button class="btn" id="zip">폴더 zip 내려받기</button>
+      <button class="btn" id="pub">모두에게 공개 (GitHub)</button>
+    </div>
+    <p class="dim" id="savemsg"></p>
+
+    <details id="ghbox">
+      <summary>GitHub 연결 설정</summary>
+      <div class="grid">
+        <label>저장소 <span class="dim">(사용자명/저장소명)</span><input id="ghrepo" type="text" placeholder="gungsan0/woolim-choir"></label>
+        <label>브랜치<input id="ghbranch" type="text" placeholder="main"></label>
+        <label>토큰 <span class="dim">(Contents 쓰기 권한)</span><input id="ghtoken" type="password" placeholder="github_pat_..."></label>
+        <label>&nbsp;<button class="btn wide" id="ghtest">연결 확인</button></label>
+      </div>
+      <p class="dim">토큰은 이 브라우저에만 저장되며 서버로 보내지 않습니다. GitHub → Settings → Developer settings →
+        Fine-grained tokens에서 <b>해당 저장소의 Contents: Read and write</b> 권한만 주면 충분합니다.</p>
+    </details>
+  </section>
+
+</div>
+<script src="vendor/fflate.min.js"></script>
+<script type="module" src="add.js"></script>
+</body>
+</html>

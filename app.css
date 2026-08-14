@@ -78,3 +78,45 @@ footer{max-width:940px;margin:0 auto 40px;padding:0 14px;font-size:11.5px;color:
   [data-sp="0.6"],[data-sp="0.9"]{display:none} #play{width:38px;height:38px}
   .mono{font-size:11px}
 }
+
+/* ── 곡 추가 페이지 ─────────────────────────── */
+.btn.ghost{background:transparent;border:1px solid #3a414d;color:#dfe3ea;padding:7px 12px;border-radius:8px;text-decoration:none;font-size:12.5px}
+.box{background:#fff;border:1px solid #e6e9ed;border-radius:12px;padding:16px 18px;margin:0 0 14px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.box h3{margin:0 0 12px;font-size:14.5px;display:flex;align-items:center;gap:8px}
+.num{display:inline-flex;width:21px;height:21px;border-radius:50%;background:#15181d;color:#fff;font-size:12px;align-items:center;justify-content:center}
+.drop{border:2px dashed #cfd6df;border-radius:10px;padding:26px 16px;text-align:center;cursor:pointer;transition:.13s;background:#fbfcfd}
+.drop:hover,.drop.over{border-color:#8b96a5;background:#f4f7fb}
+.drop p{margin:0 0 6px;font-size:13.5px}
+.dim{color:#8b94a1;font-size:12px}
+code{background:#eef1f4;padding:1px 5px;border-radius:4px;font-size:11.5px}
+.files{margin-top:10px;display:grid;gap:5px}
+.files .f{display:flex;gap:10px;font-size:12.5px;background:#f6f8fa;border-radius:7px;padding:6px 10px}
+.files .f b{min-width:104px;color:#3b4453}
+.files .f span{color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.grid label{font-size:12px;color:#5c6472;display:flex;flex-direction:column;gap:5px}
+.grid input{padding:8px 10px;border:1px solid #dfe3e8;border-radius:8px;font-size:13.5px;outline:none;font-family:inherit}
+.grid input:focus{border-color:#98a3b3}
+.row2{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.go{background:#15181d;color:#fff;border:none;padding:10px 18px;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer}
+.go:disabled{opacity:.5}
+.box .btn{background:#f2f4f7;border:1px solid #dfe3e8;color:#2b313a}
+.box .btn:hover{background:#e9edf2}
+.btn.wide{width:100%;padding:8px}
+.stats{display:grid;gap:6px;margin:4px 0 14px}
+.stats div{font-size:13px;display:flex;gap:10px}
+.stats span{min-width:52px;color:#8b94a1;font-size:12px}
+.stats .ok{color:#1f9d55}.stats .warn{color:#d97706}
+.preview{display:grid;gap:12px;margin:12px 0}
+.pv{position:relative;border:1px solid #e6e9ed;border-radius:6px;overflow:hidden;background:#fff}
+.pv img{display:block;width:100%}
+.pv i{position:absolute;display:block}
+.pv span{position:absolute;font-size:9px;color:#c0392b;transform:translateY(-100%)}
+.pv.cue::after{content:'';position:absolute;left:var(--x);width:var(--w);top:var(--y);height:var(--h);
+  border:2px solid #111;border-radius:5px;background:rgba(0,0,0,.05)}
+details summary{cursor:pointer;font-size:12.5px;color:#5c6472;margin:10px 0}
+.wrap .add{display:inline-flex;align-items:center;gap:6px;background:#15181d;color:#fff;padding:9px 14px;border-radius:9px;font-size:13px;font-weight:600;margin-left:auto}
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+
+.del{border:none;background:transparent;color:#c2c8d0;font-size:17px;line-height:1;cursor:pointer;padding:0 2px;margin-left:8px}
+.del:hover{color:#e0483c}
