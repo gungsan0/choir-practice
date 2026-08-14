@@ -1,6 +1,19 @@
 {
   "songs": [
     {
+      "id": "when-you-believe",
+      "title": "When You Believe",
+      "subtitle": "울림 어린이합창단",
+      "parts": [
+        "Children",
+        "Mum",
+        "Dad"
+      ],
+      "pages": 6,
+      "duration": 262.5,
+      "measures": 83
+    },
+    {
       "id": "song-of-the-wind-show",
       "title": "바람의 노래 Song of the Wind",
       "subtitle": "",
@@ -13,19 +26,6 @@
       "pages": 6,
       "duration": 273.35,
       "measures": 78
-    },
-    {
-      "id": "when-you-believe",
-      "title": "When You Believe",
-      "subtitle": "울림 어린이합창단",
-      "parts": [
-        "Children",
-        "Mum",
-        "Dad"
-      ],
-      "pages": 6,
-      "duration": 262.5,
-      "measures": 83
     }
   ]
 }
