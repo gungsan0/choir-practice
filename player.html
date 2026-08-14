@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>울림 합창 연습실</title>
+<meta name="theme-color" content="#15181d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header>
+  <div class="row">
+    <a class="back" href="index.html" title="곡 목록" aria-label="곡 목록">&#8592;</a>
+    <a href="index.html" class="logo" aria-label="울림 합창 연습실"><img src="logo-badge.png" width="30" height="30" alt=""></a>
+    <h1 class="title" id="ttl">&nbsp;</h1>
+    <div class="parts" id="parts"></div>
+    <button class="btn" id="mix" title="두 파트 이상 겹쳐서 함께 듣기">겹쳐 듣기</button>
+    <span class="mono" id="st"></span>
+    <span class="tag" id="lp"></span>
+  </div>
+  <div class="row">
+    <button id="play" aria-label="재생">&#9654;</button>
+    <span class="mono" id="tm">0:00 / 0:00</span>
+    <input id="bar" type="range" min="0" max="1000" value="0" aria-label="재생 위치">
+    <span class="mono" id="mn">마디 1</span>
+    <button class="btn" data-sp="0.6">0.6&times;</button>
+    <button class="btn" data-sp="0.75">0.75&times;</button>
+    <button class="btn" data-sp="0.9">0.9&times;</button>
+    <button class="btn act" data-sp="1">1&times;</button>
+    <button class="btn" id="clr">반복 해제</button>
+    <span class="mono" style="margin-left:2px">확대</span>
+    <button class="btn zm act" data-z="1">1&times;</button>
+    <button class="btn zm" data-z="1.6">1.6&times;</button>
+    <button class="btn zm" data-z="2.4">2.4&times;</button>
+    <button class="btn" id="dl">오프라인 저장</button>
+  </div>
+</header>
+<div id="spacer"></div>
+<div class="hint">
+  마디를 <b>클릭</b>하면 그 지점부터 재생 · <b>Shift+클릭</b> 두 번으로 구간 반복(A→B) 설정 ·
+  <kbd>Space</kbd> 재생/정지 · <kbd>&larr;</kbd><kbd>&rarr;</kbd> 한 마디 이동 ·
+  <b>겹쳐 듣기</b>를 켜면 두 파트 이상을 동시에 들을 수 있어요(선택한 파트가 모두 하이라이트됩니다)
+</div>
+<main id="main"></main>
+<footer id="foot"></footer>
+<script src="player.js"></script>
+</body>
+</html>
