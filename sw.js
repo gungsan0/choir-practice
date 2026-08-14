@@ -1,5 +1,5 @@
 /* 울림 합창 연습실 — 오프라인 지원 */
-const SHELL = 'shell-2026.08.14-d';
+const SHELL = 'shell-2026.08.14-e';
 const FILES = ['./', 'index.html', 'player.html', 'player.js', 'app.css',
   'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable.png', 'logo-badge.png',
   'add.html', 'add.js', 'vendor/fflate.min.js', 'vendor/pdf.min.mjs', 'vendor/pdf.worker.min.mjs'];

@@ -50,7 +50,7 @@
       if (need.length) {
         setStatus('음원 준비 중…');
         await Promise.all(need.map(async id => {
-          const r = await fetch(base + id + '.mp3');
+          const r = await getAsset(base + id + '.mp3');
           const ab = await r.arrayBuffer();
           this.buf[id] = await new Promise((res, rej) => {
             const p = this.ctx.decodeAudioData(ab, res, rej);
@@ -97,9 +97,38 @@
     upd();
   }
 
-  /* ── 초기화 ─────────────────────────────────────────────── */
-  fetch(base + 'song.json').then(r => { if (!r.ok) throw 0; return r.json(); }).then(init)
-    .catch(() => { main.innerHTML = '<div class="hint" style="display:block">곡을 불러오지 못했습니다. <a href="index.html" style="text-decoration:underline">목록으로</a></div>'; });
+  /* ── 초기화 ───────────────────────────────────────────────
+     파일은 ① 서버 ② 브라우저 저장소(오프라인·이 기기에 추가한 곡) 순서로 찾는다.
+     서비스워커가 아직 페이지를 맡기 전이어도 곡이 열리도록 하기 위함. */
+  let fromCache = false;
+  const abs = u => new URL(u, location.href).href;
+  async function getAsset(url) {
+    try { const r = await fetch(url); if (r && r.ok) return r; } catch (e) { }
+    try {
+      const hit = await caches.match(abs(url));
+      if (hit) { fromCache = true; return hit; }
+    } catch (e) { }
+    return null;
+  }
+  async function assetURL(url) {                 // <img>·<audio> 에 넣을 주소
+    if (!fromCache) return url;
+    const r = await getAsset(url);
+    return r ? URL.createObjectURL(await r.blob()) : url;
+  }
+
+  getAsset(base + 'song.json')
+    .then(r => { if (!r) throw 0; return r.json(); })
+    .then(init)
+    .catch(() => {
+      let local = false;
+      try { local = JSON.parse(localStorage.getItem('localSongs') || '[]').some(s => s.id === songId); } catch (e) { }
+      main.innerHTML = '<div class="hint" style="display:block">곡을 불러오지 못했습니다.<br>' +
+        (local
+          ? '이 기기에 추가한 곡인데 저장된 파일을 찾을 수 없습니다. 곡 목록에서 <b>다시 만들기</b>로 파일을 다시 올려주세요.'
+          : `서버에 <code>songs/${songId}/song.json</code> 이 없습니다. 곡 폴더가 지워졌을 수 있어요 — ` +
+            '<b>＋ 곡 추가 → GitHub 연결 설정 → 저장소에서 곡 목록 복구</b>를 눌러 목록을 맞춰보세요.') +
+        '<br><a href="index.html" style="text-decoration:underline">← 곡 목록</a></div>';
+    });
 
   function init(song) {
     D = song; parts = song.parts; sel = [parts[0].id];
@@ -112,8 +141,9 @@
 
     for (let i = 0; i < song.pages; i++) {
       const d = div('page'), img = new Image();
-      img.src = base + 'p' + (i + 1) + '.webp'; img.alt = '악보 ' + (i + 1) + '쪽';
+      img.alt = '악보 ' + (i + 1) + '쪽';
       img.loading = i < 2 ? 'eager' : 'lazy';
+      assetURL(base + 'p' + (i + 1) + '.webp').then(u => { img.src = u; });
       const ov = div('ov'); d.append(img, ov); main.appendChild(d); ovs.push(ov);
     }
     D.measures.forEach(m => {
@@ -125,9 +155,12 @@
     });
     parts.forEach(p => { hls[p.id] = div('hl'); });
 
-    parts.forEach((p, i) => { const a = new Audio(); a.src = base + p.id + '.mp3'; a.preload = i === 0 ? 'auto' : 'metadata'; els[p.id] = a; });
+    parts.forEach((p, i) => {
+      const a = new Audio(); a.preload = i === 0 ? 'auto' : 'metadata'; els[p.id] = a;
+      assetURL(base + p.id + '.mp3').then(u => { a.src = u; });
+    });
     EL.use(sel[0]);
-    addEventListener('load', () => setTimeout(() => parts.slice(1).forEach(p => fetch(base + p.id + '.mp3').catch(() => { })), 2000));
+    addEventListener('load', () => setTimeout(() => { if (!fromCache) parts.slice(1).forEach(p => fetch(base + p.id + '.mp3').catch(() => { })); }, 2000));
 
     wire(); fit(); render(true);
     if (isLocal()) { $('dl').textContent = '✓ 이 기기에 저장됨'; $('dl').classList.add('act'); }
