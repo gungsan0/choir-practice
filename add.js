@@ -157,11 +157,24 @@ function staffLines({ bin, W, H }) {
 }
 
 function colSets({ bin, W }, staff) {
-  const y0 = staff[0], y1 = staff[4], h = y1 - y0 + 1, out = new Uint8Array(W);
+  const y0 = staff[0], y1 = staff[4], h = y1 - y0 + 1;
+  const dens = new Float32Array(W), out = new Uint8Array(W);
   for (let x = 0; x < W; x++) {
     let s = 0;
     for (let y = y0; y <= y1; y++) s += bin[y * W + x];
-    out[x] = s >= h * .95 ? 1 : 0;
+    dens[x] = s / h;
+  }
+  // 오선 높이를 꽉 채우면서 양옆이 (오선줄 말고는) 비어 있는 열만 마디선으로 본다.
+  // 12/8 같은 박자표·음표 기둥은 옆이 두꺼워서 걸러진다.
+  const gap = Math.max(3, Math.round(h / 9));
+  for (let x = 0; x < W; x++) {
+    if (dens[x] < .95) { out[x] = 0; continue; }
+    let l = x, r = x;
+    while (l > 0 && dens[l - 1] >= .95) l--;
+    while (r < W - 1 && dens[r + 1] >= .95) r++;
+    if (r - l > Math.max(6, h / 4)) { out[x] = 0; continue; }   // 너무 두꺼운 덩어리
+    const L = dens[Math.max(0, l - gap)], R = dens[Math.min(W - 1, r + gap)];
+    out[x] = (L <= .4 && R <= .4) ? 1 : 0;
   }
   return out;
 }
@@ -180,8 +193,46 @@ function barsOf(cols, W) {
   return bars;
 }
 
-function groupSystems(staves, k) {
-  if (k) { const o = []; for (let i = 0; i < staves.length; i += k) o.push(staves.slice(i, i + k)); return o; }
+/* 단(system) 나누기 — 왼쪽 시작 세로선(괄호/첫 마디선)이 그 단의 오선을 통째로 잇는 점을 이용한다.
+   오선 사이 간격만으로 나누면 가사 줄이 있는 파트에서 틀리기 쉬워서 이 방법을 먼저 쓴다. */
+function systemsByBracket(pd, staves) {
+  const { bin, W, H } = pd, h = staves[0][4] - staves[0][0];
+  const xs = new Set();
+  staves.forEach(st => {                       // 각 오선이 시작되는 x (첫 단은 파트 이름 때문에 더 오른쪽)
+    const y = st[0] * W;
+    for (let x = 0; x < W; x++) if (bin[y + x]) { xs.add(x); break; }
+  });
+  const cand = new Set();
+  xs.forEach(x0 => { for (let x = Math.max(0, x0 - 6); x < x0 + 12; x++) cand.add(x); });
+  const runs = [];
+  [...cand].sort((a, b) => a - b).forEach(x => {
+    let y = 0;
+    while (y < H) {
+      if (bin[y * W + x]) {
+        const s = y;
+        while (y < H && bin[y * W + x]) y++;
+        if (y - 1 - s > h * 1.4) runs.push([s, y - 1]);
+      } else y++;
+    }
+  });
+  runs.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  runs.forEach(r => {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([r[0], r[1]]);
+  });
+  const out = [], used = new Set();
+  merged.forEach(([s, e]) => {
+    const grp = staves.filter((st, i) => st[0] >= s - 8 && st[4] <= e + 8 && !used.has(i) && used.add(i) !== null);
+    if (grp.length) out.push(grp);
+  });
+  staves.forEach((st, i) => { if (!used.has(i)) out.push([st]); });
+  out.sort((a, b) => a[0][0] - b[0][0]);
+  return out;
+}
+
+function groupByGaps(staves) {
   const gaps = staves.slice(1).map((s, i) => s[0] - staves[i][4]);
   if (!gaps.length) return [staves];
   const srt = [...gaps].sort((a, b) => a - b);
@@ -191,6 +242,14 @@ function groupSystems(staves, k) {
   gaps.forEach((g, i) => { if (g > thr) { out.push(cur); cur = [staves[i + 1]]; } else cur.push(staves[i + 1]); });
   out.push(cur);
   return out;
+}
+
+function groupSystems(pd, staves, k) {
+  if (k) { const o = []; for (let i = 0; i < staves.length; i += k) o.push(staves.slice(i, i + k)); return o; }
+  const byBracket = systemsByBracket(pd, staves);
+  const sizes = new Set(byBracket.map(g => g.length));
+  if (byBracket.length && sizes.size <= 2) return byBracket;   // 단마다 오선 수가 고르면 신뢰
+  return groupByGaps(staves);
 }
 
 function analyzeLayout(pages, expect, forceK) {
@@ -205,7 +264,7 @@ function analyzeLayout(pages, expect, forceK) {
     const out = []; let total = 0;
     for (const p of data) {
       const ps = [];
-      for (const sysv of groupSystems(p.staves, k)) {
+      for (const sysv of groupSystems(p.pd, p.staves, k)) {
         const bars = barsOf(sysv.map(s => p.cols[p.staves.indexOf(s)]), p.pd.W);
         if (bars.length < 2) return null;
         total += bars.length - 1;
@@ -213,17 +272,20 @@ function analyzeLayout(pages, expect, forceK) {
       }
       out.push(ps);
     }
-    return { pages: out, total, k: k || (data[0].staves.length / out[0].length) };
+    return { pages: out, total, k: k || out[0][0].staves.length };
   };
 
   let chosen = null;
-  const ks = forceK ? [forceK] : [...Array(8).keys()].map(i => i + 1)
-    .filter(k => data.every(p => p.staves.length % k === 0)).concat([null]);
-  for (const k of ks) {
-    const r = build(k);
-    if (!r) continue;
-    if (expect && r.total === expect) { chosen = r; break; }
-    if (!chosen) chosen = r;
+  if (forceK) chosen = build(forceK);
+  else {
+    chosen = build(null);                                  // 오선 간격으로 자동 판단(기본)
+    if (expect && (!chosen || chosen.total !== expect)) {   // 악보 파일이 있으면 마디 수로 검증
+      for (const k of [...Array(8).keys()].map(i => i + 1)
+        .filter(k => data.every(p => p.staves.length % k === 0))) {
+        const r = build(k);
+        if (r && r.total === expect) { chosen = r; break; }
+      }
+    }
   }
   if (!chosen) throw new Error('마디선을 찾지 못했습니다.');
   chosen.W = data[0].pd.W; chosen.H = data[0].pd.H;
@@ -385,7 +447,10 @@ async function run(fresh) {
       if (fit) { bpm = bpm ?? fit.bpm; off = off ?? fit.off; LAY.fit = fit; }
     }
     if (bpm === null) bpm = (SC && SC.tempo[1]) || 120;
-    if (off === null) off = 0;
+    if (off === null) {                                  // 악보 파일이 없으면 첫 소리를 1마디 시작으로
+      if (!detOnsets) { prog('음원의 첫 소리를 찾는 중…'); await new Promise(r => setTimeout(r, 20)); detOnsets = onsetTimes(abuf); }
+      off = detOnsets.length ? Math.max(0, detOnsets[0] - 0.03) : 0;
+    }
     ctx.close();
 
     const beats = (SC ? [...SC.beats] : []);
@@ -408,9 +473,12 @@ async function run(fresh) {
         : ` <b class="warn">⚠ MuseScore 파일은 ${SC.measures}개</b>`) : '')],
       ['파트', order.join(' → ')],
       ['길이', Math.floor(duration / 60) + '분 ' + Math.round(duration % 60) + '초'],
-      ['템포', bpm + ' BPM 시작' + (LAY.fit ? ` · 음원 대조 오차 ${LAY.fit.score.toFixed(3)}초` : ' (직접 지정)')]
+      ['템포', bpm + ' BPM 시작' + (LAY.fit ? ` · 음원 대조 오차 ${LAY.fit.score.toFixed(3)}초`
+        : (SC ? ' (직접 지정)' : ' — <b class="warn">악보에 적힌 템포를 입력하고 “다시 계산”을 눌러주세요</b>'
+          + '<br><span class="dim">6/8·12/8처럼 점음표 박자면 ♩.= 숫자를 그대로 넣으면 됩니다. MuseScore 파일(.mscz)을 같이 올리면 자동으로 맞춥니다.</span>'))]
     ].map(r => `<div><span>${r[0]}</span>${r[1]}</div>`).join('');
     drawPreview();
+    window.__dbg = { LAY, SONG, SC, PAGES };
     prog('완료');
   } catch (e) {
     prog('');

@@ -169,19 +169,73 @@ def detect_layout(pdf, workdir, dpi, staves_per_system=None, expect_measures=Non
             die(f"{f.name}: 오선 줄 수가 5의 배수가 아닙니다({len(centers)}줄). --dpi 를 조정해보세요.")
         staff_list = [centers[i:i + 5] for i in range(0, len(centers), 5)]
 
-        # 오선마다 '세로로 꽉 찬 열'(마디선 후보)을 미리 구해둔다
+        # 오선마다 마디선 후보 열을 구한다.
+        # (오선 높이를 꽉 채우면서 양옆이 비어 있는 얇은 세로선만 = 12/8 같은 박자표·음표 기둥은 제외)
         colsets = []
         for st in staff_list:
             y0, y1 = st[0], st[-1]
             h = y1 - y0 + 1
-            colsets.append({x for x in range(W) if a[y0:y1 + 1, x].sum() >= h * 0.95})
-        pages_data.append(dict(staves=staff_list, cols=colsets, W=W, H=H))
+            dens = a[y0:y1 + 1, :].sum(0) / h
+            full = dens >= 0.95
+            gap = max(3, int(round(h / 9)))
+            keep = set()
+            x = 0
+            while x < W:
+                if not full[x]:
+                    x += 1
+                    continue
+                l = x
+                while x < W and full[x]:
+                    x += 1
+                r = x - 1
+                if r - l > max(6, h / 4):
+                    continue
+                if dens[max(0, l - gap)] <= 0.4 and dens[min(W - 1, r + gap)] <= 0.4:
+                    keep.update(range(l, r + 1))
+            colsets.append(keep)
+        pages_data.append(dict(staves=staff_list, cols=colsets, W=W, H=H, bin=a))
 
-    def group(page, k=None):
-        """staff 목록을 '단'으로 묶는다. k가 주어지면 k개씩, 아니면 간격으로 판단."""
-        sl = page["staves"]
-        if k:
-            return [sl[i:i + k] for i in range(0, len(sl), k)]
+    def by_bracket(page):
+        """단 시작의 세로선(괄호/첫 마디선)이 그 단의 오선을 통째로 잇는 것을 이용해 단을 나눈다."""
+        a, sl, W, H = page["bin"], page["staves"], page["W"], page["H"]
+        h = sl[0][-1] - sl[0][0]
+        xs = set()
+        for st in sl:
+            nz = np.nonzero(a[st[0]])[0]
+            if len(nz):
+                xs.add(int(nz[0]))
+        cand = sorted({x for x0 in xs for x in range(max(0, x0 - 6), x0 + 12)})
+        runs = []
+        for x in cand:
+            col = a[:, x]
+            y = 0
+            while y < H:
+                if col[y]:
+                    s0 = y
+                    while y < H and col[y]:
+                        y += 1
+                    if (y - 1 - s0) > h * 1.4:
+                        runs.append([s0, y - 1])
+                else:
+                    y += 1
+        runs.sort()
+        merged = []
+        for r in runs:
+            if merged and r[0] <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], r[1])
+            else:
+                merged.append(list(r))
+        out, used = [], set()
+        for s0, e0 in merged:
+            grp = [i for i, st in enumerate(sl) if st[0] >= s0 - 8 and st[-1] <= e0 + 8 and i not in used]
+            if grp:
+                used.update(grp)
+                out.append([sl[i] for i in grp])
+        out += [[st] for i, st in enumerate(sl) if i not in used]
+        out.sort(key=lambda g: g[0][0])
+        return out
+
+    def by_gaps(sl):
         gaps = [sl[i + 1][0] - sl[i][-1] for i in range(len(sl) - 1)]
         if not gaps:
             return [sl]
@@ -196,6 +250,16 @@ def detect_layout(pdf, workdir, dpi, staves_per_system=None, expect_measures=Non
                 cur_sys.append(st)
         out.append(cur_sys)
         return out
+
+    def group(page, k=None):
+        """staff 목록을 '단'으로 묶는다. k가 주어지면 k개씩, 아니면 자동."""
+        sl = page["staves"]
+        if k:
+            return [sl[i:i + k] for i in range(0, len(sl), k)]
+        b = by_bracket(page)
+        if b and len({len(g) for g in b}) <= 2:
+            return b
+        return by_gaps(sl)
 
     def bars_of(page, sysv):
         cols = [page["cols"][page["staves"].index(st)] for st in sysv]
@@ -227,18 +291,18 @@ def detect_layout(pdf, workdir, dpi, staves_per_system=None, expect_measures=Non
         return out, total
 
     # 한 단에 몇 오선인지: 지정값 → (마디 수가 악보와 맞는 값) → 간격 자동판단
-    candidates = [staves_per_system] if staves_per_system else \
-        ([k for k in range(1, 9) if all(len(p["staves"]) % k == 0 for p in pages_data)] + [None])
     chosen, layout, total = None, None, -1
-    for k in candidates:
-        lay, n = assemble(k)
-        if lay is None:
-            continue
-        if expect_measures and n == expect_measures:
-            chosen, layout, total = k, lay, n
-            break
-        if layout is None:
-            chosen, layout, total = k, lay, n
+    if staves_per_system:
+        layout, total = assemble(staves_per_system)
+        chosen = staves_per_system
+    else:
+        layout, total = assemble(None)
+        if expect_measures and total != expect_measures:
+            for k in [k for k in range(1, 9) if all(len(p["staves"]) % k == 0 for p in pages_data)]:
+                lay, n = assemble(k)
+                if lay is not None and n == expect_measures:
+                    chosen, layout, total = k, lay, n
+                    break
     if layout is None:
         die("마디선을 찾지 못했습니다. --dpi 를 조정하거나 --staves-per-system 을 지정해보세요.")
     return layout, sizes, pages
