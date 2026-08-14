@@ -1,6 +1,20 @@
 {
   "songs": [
     {
+      "id": "song-of-the-wind",
+      "title": "바람의 노래 Song of the Wind",
+      "subtitle": "",
+      "parts": [
+        "Soprano",
+        "Alto",
+        "Tenor",
+        "Bass"
+      ],
+      "pages": 6,
+      "duration": 273.35,
+      "measures": 79
+    },
+    {
       "id": "when-you-believe",
       "title": "When You Believe",
       "subtitle": "울림 어린이합창단",
