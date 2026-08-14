@@ -101,6 +101,20 @@ brew install ffmpeg poppler            # macOS
 python3 -m http.server 8000    # 앱 폴더에서 실행 → http://localhost:8000/
 ```
 
+## 앱을 새 버전으로 업데이트할 때 ⚠️
+
+**`songs/` 폴더와 `songs/index.json` 은 절대 덮어쓰지 마세요.** 추가한 곡이 목록에서 사라집니다.
+업데이트용 zip(`woolim-app-update.zip`)에는 곡 폴더가 아예 들어있지 않으니 그대로 올리면 안전합니다.
+
+- **GitHub 웹에서**: 업데이트 zip을 푼 뒤 그 안의 파일들만 드래그해서 올립니다(같은 이름 파일만 갱신됩니다).
+- **터미널에서**: 업데이트 zip을 저장소 폴더에 풀고 `git add -A && git commit -m update && git push`.
+  (`songs/` 는 zip에 없으므로 건드려지지 않습니다.)
+- 기기에 저장한 곡(브라우저 캐시)은 앱을 덮어써도 사라지지 않습니다.
+
+**이미 덮어써서 곡 목록이 비었다면**: 곡 파일 자체는 저장소의 `songs/` 에 남아 있습니다.
+곡 추가 화면 아래 **GitHub 연결 설정 → 저장소에서 곡 목록 복구**를 누르면
+`songs/` 폴더를 훑어 `songs/index.json` 을 다시 만들어 줍니다.
+
 ## 배포 (GitHub Pages)
 
 1. 이 폴더의 파일 전체를 새 저장소(public)에 올립니다.

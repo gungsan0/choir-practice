@@ -610,6 +610,36 @@ $('ghtest').onclick = async () => {
   try { const r = await GH.api(''); $('savemsg').textContent = r ? `연결됨: ${r.full_name}` : '저장소를 찾을 수 없습니다.'; }
   catch (e) { $('savemsg').textContent = e.message; }
 };
+$('ghsync').onclick = async () => {
+  if (!GH.cfg.repo || !GH.cfg.token) { $('savemsg').textContent = '저장소와 토큰을 먼저 입력해주세요.'; return; }
+  const btn = $('ghsync'); btn.disabled = true;
+  try {
+    const branch = GH.cfg.branch || 'main';
+    const dirs = await GH.api('/contents/songs?ref=' + branch);
+    if (!Array.isArray(dirs)) throw new Error('songs 폴더를 찾지 못했습니다.');
+    const songs = [];
+    for (const d of dirs.filter(x => x.type === 'dir')) {
+      $('savemsg').textContent = `읽는 중… ${d.name}`;
+      const f = await GH.api('/contents/songs/' + d.name + '/song.json?ref=' + branch);
+      if (!f || !f.content) continue;
+      let j;
+      try { j = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(f.content.replace(/\n/g, '')), c => c.charCodeAt(0)))); }
+      catch (e) { continue; }
+      songs.push({
+        id: j.id || d.name, title: j.title || d.name, subtitle: j.subtitle || '',
+        parts: (j.parts || []).map(p => p.id || p), pages: j.pages,
+        duration: j.duration, measures: (j.measures || []).length
+      });
+    }
+    songs.sort((a, b) => a.title.localeCompare(b.title));
+    const cur = await GH.api('/contents/songs/index.json?ref=' + branch);
+    await GH.put('songs/index.json', new Blob([JSON.stringify({ songs }, null, 2)], { type: 'application/json' }),
+      'rebuild song list');
+    $('savemsg').innerHTML = `곡 ${songs.length}개로 목록을 다시 만들었습니다: ${songs.map(s => s.title).join(', ')} — <a href="index.html">곡 목록 →</a>`;
+  } catch (e) { $('savemsg').textContent = '복구 실패: ' + e.message; }
+  btn.disabled = false;
+};
+
 $('pub').onclick = async () => {
   if (!GH.cfg.repo || !GH.cfg.token) { $('ghbox').open = true; $('savemsg').textContent = '먼저 GitHub 저장소와 토큰을 입력해주세요.'; return; }
   const btn = $('pub'); btn.disabled = true;

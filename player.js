@@ -9,7 +9,7 @@
   const base = 'songs/' + songId + '/';
 
   let D = null, parts = [], sel = [], els = {}, cur = -1, rate = 1;
-  let loopA = null, loopB = null, multi = false;
+  let loopA = null, loopB = null, multi = false, loopMode = false;
   const ovs = [], sys = div('sys'), ph = div('ph'), lmk = div('loopmark'), hls = {};
 
   function div(c) { const d = document.createElement('div'); d.className = c; return d; }
@@ -120,7 +120,7 @@
       const h = div('hit');
       h.style.cssText = `left:${m.x}%;width:${m.w}%;top:${m.sy[0]}%;height:${m.sy[1]}%`;
       h.title = '마디 ' + m.m;
-      h.onclick = e => e.shiftKey ? setLoop(m.m) : seekM(m.m);
+      h.onclick = e => (loopMode || e.shiftKey) ? setLoop(m.m) : seekM(m.m);
       ovs[m.pg].appendChild(h);
     });
     parts.forEach(p => { hls[p.id] = div('hl'); });
@@ -143,14 +143,35 @@
     while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (D.times[mid] <= t) lo = mid; else hi = mid - 1; }
     return lo + 1;
   }
-  const seekM = m => { setT(D.times[m - 1]); render(true); };
+  const EPS = 0.02;                       // mp3 탐색이 프레임 경계로 밀리는 것 보정
+  const seekM = m => { setT(D.times[m - 1] + EPS); render(true); };
   const upd = () => { $('play').innerHTML = E.paused ? '&#9654;' : '&#10074;&#10074;'; };
 
   function setLoop(m) {
-    if (loopA === null || loopB !== null) { loopA = m; loopB = null; } else { loopB = Math.max(m, loopA); }
-    $('lp').textContent = loopB !== null ? ('🔁 ' + loopA + '~' + loopB + ' 마디') : ('🔁 시작 ' + loopA + ' 마디 — 끝 마디를 Shift+클릭');
-    const a = D.measures[loopA - 1], b = D.measures[(loopB || loopA) - 1];
+    if (loopA === null || loopB !== null) { loopA = m; loopB = null; }
+    else { loopB = Math.max(m, loopA); loopMode = false; setT(D.times[loopA - 1] + EPS); }
+    paintLoop();
+  }
+  function clearLoop() { loopA = loopB = null; loopMode = false; lmk.remove(); paintLoop(); }
+  function paintLoop() {
+    const btn = $('loop');
+    btn.classList.toggle('act', loopMode || loopA !== null);
+    if (loopB !== null) {
+      btn.textContent = `🔁 ${loopA}~${loopB} 마디 ✕`;
+      $('lp').textContent = '';
+    } else if (loopA !== null) {
+      btn.textContent = '🔁 끝 마디 선택';
+      $('lp').textContent = `시작 ${loopA}마디 — 끝 마디를 누르세요`;
+    } else if (loopMode) {
+      btn.textContent = '🔁 시작 마디 선택';
+      $('lp').textContent = '반복할 시작 마디를 누르세요';
+    } else {
+      btn.textContent = '🔁 구간 반복';
+      $('lp').textContent = '';
+    }
     lmk.remove();
+    if (loopA === null) return;
+    const a = D.measures[loopA - 1], b = D.measures[(loopB || loopA) - 1];
     if (a.pg === b.pg) {
       ovs[a.pg].appendChild(lmk);
       lmk.style.cssText = `left:${a.x}%;width:${b.x + b.w - a.x}%;top:${a.sy[0]}%;height:${a.sy[1]}%`;
@@ -209,7 +230,11 @@
       requestAnimationFrame(() => sys.scrollIntoView({ block: 'center', inline: 'center' }));
     });
     $('bar').oninput = () => { setT($('bar').value / 1000 * dur()); render(true); };
-    $('clr').onclick = () => { loopA = loopB = null; lmk.remove(); $('lp').textContent = ''; };
+    $('loop').onclick = () => {
+      if (loopB !== null || (loopA !== null && loopMode === false)) clearLoop();
+      else if (loopMode) clearLoop();
+      else { loopMode = true; paintLoop(); }
+    };
     $('dl').onclick = saveOffline;
     $('rf').onclick = async () => {
       if (isLocal()) { alert('이 곡은 이 기기에서 추가한 곡이라 다시 받을 원본이 없습니다.\n곡 목록에서 “다시 만들기”를 눌러주세요.'); return; }
@@ -249,7 +274,7 @@
   function render(force) {
     if (!D) return;
     const t = T();
-    if (loopB !== null && (t >= D.times[loopB] || t < D.times[loopA - 1] - 0.6)) { setT(D.times[loopA - 1]); return; }
+    if (loopB !== null && (t >= D.times[loopB] || t < D.times[loopA - 1] - 0.6)) { setT(D.times[loopA - 1] + EPS); return; }
     const m = mAt(t), o = D.measures[m - 1];
     $('bar').value = Math.min(1000, t / dur() * 1000);
     $('tm').textContent = fmt(t) + ' / ' + fmt(dur());
