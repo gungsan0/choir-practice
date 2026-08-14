@@ -1,5 +1,5 @@
 /* 울림 합창 연습실 — 오프라인 지원 */
-const SHELL = 'shell-v4';
+const SHELL = 'shell-2026.08.14-b';
 const FILES = ['./', 'index.html', 'player.html', 'player.js', 'app.css',
   'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable.png', 'logo-badge.png',
   'add.html', 'add.js', 'vendor/fflate.min.js', 'vendor/pdf.min.mjs', 'vendor/pdf.worker.min.mjs'];
@@ -72,16 +72,32 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // 그 외에는 캐시 우선 (?song=... 같은 주소는 물음표 뒤를 무시하고 찾는다)
-  const opts = { ignoreSearch: url.pathname.endsWith('.html') || url.pathname.endsWith('/') };
+  const isSong = url.pathname.includes('/songs/');
+
+  // 앱 파일(html·js·css·아이콘)은 '최신 먼저' — 고친 내용이 바로 반영되도록.
+  //  (실패하면 캐시로 넘어가므로 오프라인에서도 그대로 열립니다)
+  if (!isSong) {
+    e.respondWith(
+      fetch(req).then(r => {
+        if (r && r.status === 200) {
+          const cp = r.clone();
+          caches.open(SHELL).then(c => c.put(req, cp)).catch(() => { });
+        }
+        return r;
+      }).catch(() => caches.match(req, { ignoreSearch: true })
+        .then(hit => hit || caches.match('index.html', { ignoreSearch: true })))
+    );
+    return;
+  }
+
+  // 곡 파일(악보 이미지·음원)은 캐시 우선 — 크고 잘 바뀌지 않습니다.
   e.respondWith(
-    caches.match(req, opts).then(hit => hit || fetch(req).then(r => {
-      if (r.ok && r.status === 200 &&
-        (url.pathname.includes('/songs/') || FILES.some(f => url.pathname.endsWith(f)))) {
+    caches.match(req, { ignoreSearch: false }).then(hit => hit || fetch(req).then(r => {
+      if (r.ok && r.status === 200) {
         const cp = r.clone();
         caches.open(cacheNameFor(url)).then(c => c.put(req, cp)).catch(() => { });
       }
       return r;
-    }).catch(() => caches.match('index.html')))
+    }))
   );
 });
