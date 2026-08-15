@@ -567,7 +567,7 @@ async function buildFiles() {
 
 /* 이 기기에 저장 — 플레이어가 그대로 읽을 수 있도록 캐시에 넣는다 */
 $('save').onclick = async () => {
-  const btn = $('save'); btn.disabled = true; $('savemsg').textContent = '저장 중…';
+  const btn = $('save'); btn.disabled = true; msg('저장 중…');
   try {
     const files = await buildFiles();
     const c = await caches.open('songs-' + SONG.id);
@@ -580,14 +580,14 @@ $('save').onclick = async () => {
     const local = JSON.parse(localStorage.getItem('localSongs') || '[]').filter(s => s.id !== SONG.id);
     local.push({ id: SONG.id, title: SONG.title, subtitle: SONG.subtitle, parts: SONG.parts.map(p => p.id), pages: SONG.pages, duration: SONG.duration, measures: SONG.measures.length, local: true });
     localStorage.setItem('localSongs', JSON.stringify(local));
-    $('savemsg').innerHTML = `저장했습니다. <a href="player.html?song=${SONG.id}">바로 연습하기 →</a>`;
-  } catch (e) { $('savemsg').textContent = '저장 실패: ' + e.message; }
+    msg(`저장했습니다. <a href="player.html?song=${SONG.id}">바로 연습하기 →</a>`);
+  } catch (e) { msg('저장 실패: ' + e.message); }
   btn.disabled = false;
 };
 
 /* zip 내려받기 */
 $('zip').onclick = async () => {
-  $('savemsg').textContent = 'zip 만드는 중…';
+  msg('zip 만드는 중…');
   const files = await buildFiles(), z = {};
   for (const name in files) z['songs/' + SONG.id + '/' + name] = new Uint8Array(await files[name].arrayBuffer());
   z['songs/' + SONG.id + '/README.txt'] = new TextEncoder().encode(
@@ -595,7 +595,20 @@ $('zip').onclick = async () => {
   const blob = new Blob([fflate.zipSync(z)], { type: 'application/zip' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = SONG.id + '.zip'; a.click();
-  $('savemsg').textContent = '내려받았습니다.';
+  msg('내려받았습니다.');
+};
+
+const friendly = (e) => {
+  const m = (e && e.message) || String(e);
+  if (m.includes('401')) return '토큰이 올바르지 않습니다(401). 새로 발급해 붙여넣어 주세요.';
+  if (m.includes('403')) return '권한이 없습니다(403). 토큰에 이 저장소의 Contents: Read and write 권한을 주세요.';
+  if (m.includes('404')) return '경로를 찾을 수 없습니다(404). 저장소 이름과 브랜치를 확인해주세요.';
+  if (m.includes('Failed to fetch')) return '네트워크에 연결하지 못했습니다. 인터넷 상태를 확인해주세요.';
+  return m;
+};
+
+const msg = (html) => {
+  ['savemsg', 'ghmsg'].forEach(id => { const e = $(id); if (e) e.innerHTML = html; });
 };
 
 const entry = () => ({ id: SONG.id, title: SONG.title, subtitle: SONG.subtitle, parts: SONG.parts.map(p => p.id), accomp: SONG.accomp || null, pages: SONG.pages, duration: SONG.duration, measures: SONG.measures.length });
@@ -627,11 +640,25 @@ for (const [k, el] of Object.entries({ repo: 'ghrepo', branch: 'ghbranch', token
   $(el).oninput = () => { GH.cfg = { ...GH.cfg, [k]: $(el).value.trim() }; };
 }
 $('ghtest').onclick = async () => {
-  try { const r = await GH.api(''); $('savemsg').textContent = r ? `연결됨: ${r.full_name}` : '저장소를 찾을 수 없습니다.'; }
-  catch (e) { $('savemsg').textContent = e.message; }
+  const c = GH.cfg;
+  if (!c.repo || !c.token) { msg('저장소와 토큰을 모두 입력해주세요. (지금: 저장소 ' + (c.repo ? '“' + c.repo + '”' : '없음') + ' / 토큰 ' + (c.token ? '입력됨' : '없음') + ')'); return; }
+  msg('확인 중…');
+  try {
+    const r = await GH.api('');
+    msg(r ? `✓ 연결됨: ${r.full_name} (브랜치 ${c.branch || 'main'})`
+          : `저장소를 찾을 수 없습니다 — “${c.repo}” 철자와 토큰 권한(해당 저장소 Contents 읽기/쓰기)을 확인해주세요.`);
+  } catch (e) {
+    msg(friendly(e));
+  }
 };
+$('ghbox').addEventListener('toggle', () => {
+  if (!$('ghbox').open) return;
+  const c = GH.cfg;
+  msg('현재 설정 — 저장소: ' + (c.repo || '없음') + ' / 브랜치: ' + (c.branch || 'main') + ' / 토큰: ' + (c.token ? '저장됨' : '없음'));
+});
+
 $('ghsync').onclick = async () => {
-  if (!GH.cfg.repo || !GH.cfg.token) { $('savemsg').textContent = '저장소와 토큰을 먼저 입력해주세요.'; return; }
+  if (!GH.cfg.repo || !GH.cfg.token) { msg('저장소와 토큰을 먼저 입력해주세요.'); return; }
   const btn = $('ghsync'); btn.disabled = true;
   try {
     const branch = GH.cfg.branch || 'main';
@@ -639,7 +666,7 @@ $('ghsync').onclick = async () => {
     if (!Array.isArray(dirs)) throw new Error('songs 폴더를 찾지 못했습니다.');
     const songs = [];
     for (const d of dirs.filter(x => x.type === 'dir')) {
-      $('savemsg').textContent = `읽는 중… ${d.name}`;
+      msg(`읽는 중… ${d.name}`);
       const f = await GH.api('/contents/songs/' + d.name + '/song.json?ref=' + branch);
       if (!f || !f.content) continue;
       let j;
@@ -655,29 +682,29 @@ $('ghsync').onclick = async () => {
     const cur = await GH.api('/contents/songs/index.json?ref=' + branch);
     await GH.put('songs/index.json', new Blob([JSON.stringify({ songs }, null, 2)], { type: 'application/json' }),
       'rebuild song list');
-    $('savemsg').innerHTML = `곡 ${songs.length}개로 목록을 다시 만들었습니다: ${songs.map(s => s.title).join(', ')} — <a href="index.html">곡 목록 →</a>`;
-  } catch (e) { $('savemsg').textContent = '복구 실패: ' + e.message; }
+    msg(`곡 ${songs.length}개로 목록을 다시 만들었습니다: ${songs.map(s => s.title).join(', ')} — <a href="index.html">곡 목록 →</a>`);
+  } catch (e) { msg('복구 실패 — ' + friendly(e)); }
   btn.disabled = false;
 };
 
 $('pub').onclick = async () => {
-  if (!GH.cfg.repo || !GH.cfg.token) { $('ghbox').open = true; $('savemsg').textContent = '먼저 GitHub 저장소와 토큰을 입력해주세요.'; return; }
+  if (!GH.cfg.repo || !GH.cfg.token) { $('ghbox').open = true; msg('먼저 GitHub 저장소와 토큰을 입력해주세요.'); return; }
   const btn = $('pub'); btn.disabled = true;
   try {
     const files = await buildFiles();
     let i = 0;
     for (const name in files) {
-      i++; $('savemsg').textContent = `업로드 중… (${i}/${Object.keys(files).length + 1}) ${name}`;
+      i++; msg(`업로드 중… (${i}/${Object.keys(files).length + 1}) ${name}`);
       await GH.put('songs/' + SONG.id + '/' + name, files[name], 'add ' + SONG.id + '/' + name);
     }
-    $('savemsg').textContent = '곡 목록 갱신 중…';
+    msg('곡 목록 갱신 중…');
     const cur = await GH.api('/contents/songs/index.json?ref=' + (GH.cfg.branch || 'main'));
     let idx = { songs: [] };
     if (cur && cur.content) { try { idx = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(cur.content.replace(/\n/g, '')), ch => ch.charCodeAt(0)))); } catch (e) { } }
     idx.songs = (idx.songs || []).filter(s => s.id !== SONG.id).concat([entry()]).sort((a, b) => a.title.localeCompare(b.title));
     await GH.put('songs/index.json', new Blob([JSON.stringify(idx, null, 2)], { type: 'application/json' }), 'update song list');
-    $('savemsg').innerHTML = '공개했습니다. 1~2분 뒤 사이트에 반영됩니다. <a href="index.html">곡 목록 →</a>';
-  } catch (e) { $('savemsg').textContent = '공개 실패: ' + e.message; }
+    msg('공개했습니다. 1~2분 뒤 사이트에 반영됩니다. <a href="index.html">곡 목록 →</a>');
+  } catch (e) { msg('공개 실패 — ' + friendly(e)); }
   btn.disabled = false;
 };
 
