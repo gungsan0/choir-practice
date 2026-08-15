@@ -11,6 +11,7 @@
   let D = null, parts = [], sel = [], els = {}, cur = -1, rate = 1;
   let loopA = null, loopB = null, multi = false, loopMode = false;
   let accId = null, accOn = false, accVol = 0.6;   // 반주
+  let syncOff = 0;                                 // 악보 싱크 미세조정(초)
   const ovs = [], sys = div('sys'), ph = div('ph'), lmk = div('loopmark'), hls = {};
 
   function div(c) { const d = document.createElement('div'); d.className = c; return d; }
@@ -185,12 +186,13 @@
     return lo + 1;
   }
   const EPS = 0.02;                       // mp3 탐색이 프레임 경계로 밀리는 것 보정
-  const seekM = m => { setT(D.times[m - 1] + EPS); render(true); };
+  const mt = () => T() + syncOff;                  // 악보 기준 시각
+  const seekM = m => { setT(D.times[m - 1] - syncOff + EPS); render(true); };
   const upd = () => { $('play').innerHTML = E.paused ? '&#9654;' : '&#10074;&#10074;'; };
 
   function setLoop(m) {
     if (loopA === null || loopB !== null) { loopA = m; loopB = null; }
-    else { loopB = Math.max(m, loopA); loopMode = false; setT(D.times[loopA - 1] + EPS); }
+    else { loopB = Math.max(m, loopA); loopMode = false; setT(D.times[loopA - 1] - syncOff + EPS); }
     paintLoop();
   }
   function clearLoop() { loopA = loopB = null; loopMode = false; lmk.remove(); paintLoop(); }
@@ -287,6 +289,13 @@
       accVol = +$('accvol').value / 100;
       if (WA.gacc) WA.gacc.gain.value = accVol;
     };
+    const showSync = () => { $('sync').textContent = '싱크 ' + (syncOff >= 0 ? '+' : '') + syncOff.toFixed(1) + '초'; $('sync').classList.toggle('act', syncOff !== 0); };
+    const bump = v => { syncOff = Math.round((syncOff + v) * 10) / 10; localStorage.setItem('sync-' + songId, syncOff); showSync(); render(true); };
+    $('syncm').onclick = () => bump(-0.2);
+    $('syncp').onclick = () => bump(0.2);
+    $('sync').onclick = () => { syncOff = 0; localStorage.setItem('sync-' + songId, 0); showSync(); render(true); };
+    try { syncOff = +(localStorage.getItem('sync-' + songId) || 0) || 0; } catch (e) { }
+    showSync();
     $('dl').onclick = saveOffline;
     $('rf').onclick = async () => {
       if (isLocal()) { alert('이 곡은 이 기기에서 추가한 곡이라 다시 받을 원본이 없습니다.\n곡 목록에서 “다시 만들기”를 눌러주세요.'); return; }
@@ -326,11 +335,11 @@
 
   function render(force) {
     if (!D) return;
-    const t = T();
-    if (loopB !== null && (t >= D.times[loopB] || t < D.times[loopA - 1] - 0.6)) { setT(D.times[loopA - 1] + EPS); return; }
+    const t = mt();
+    if (loopB !== null && (t >= D.times[loopB] || t < D.times[loopA - 1] - 0.6)) { setT(D.times[loopA - 1] - syncOff + EPS); return; }
     const m = mAt(t), o = D.measures[m - 1];
-    $('bar').value = Math.min(1000, t / dur() * 1000);
-    $('tm').textContent = fmt(t) + ' / ' + fmt(dur());
+    $('bar').value = Math.min(1000, T() / dur() * 1000);
+    $('tm').textContent = fmt(T()) + ' / ' + fmt(dur());
     $('mn').textContent = '마디 ' + m;
     if (m !== cur || force) {
       cur = m;
@@ -339,7 +348,8 @@
       parts.forEach((p, i) => {
         const el = hls[p.id];
         if (!sel.includes(p.id)) { el.remove(); return; }
-        const b = o.b[Math.min(i, o.b.length - 1)], c = rgb(p.color);
+        const b = (D.band === 'system') ? [o.sy[0], o.sy[1]] : o.b[Math.min(i, o.b.length - 1)];
+        const c = rgb(p.color);
         ovs[o.pg].appendChild(el);
         el.style.cssText = `left:${o.x}%;width:${o.w}%;top:${b[0]}%;height:${b[1]}%;` +
           `background:rgba(${c},.30);box-shadow:0 0 0 2px rgba(${c},.75) inset`;
