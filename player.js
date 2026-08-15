@@ -12,7 +12,7 @@
   let loopA = null, loopB = null, multi = false, loopMode = false;
   let accId = null, accOn = false, accVol = 0.6;   // 반주
   let syncOff = 0;                                 // 악보 싱크 미세조정(초)
-  const ovs = [], sys = div('sys'), ph = div('ph'), lmk = div('loopmark'), hls = {};
+  const ovs = [], sys = div('sys'), lmk = div('loopmark'), hls = {};
 
   function div(c) { const d = document.createElement('div'); d.className = c; return d; }
   const dur = () => D.times[D.times.length - 1];
@@ -368,7 +368,7 @@
     $('mn').textContent = '마디 ' + m;
     if (m !== cur || force) {
       cur = m;
-      ovs[o.pg].append(sys, ph);
+      ovs[o.pg].append(sys);
       sys.style.cssText = `left:${o.x}%;width:${o.w}%;top:${o.sy[0]}%;height:${o.sy[1]}%`;
       parts.forEach((p, i) => {
         const el = hls[p.id];
@@ -379,13 +379,10 @@
         el.style.cssText = `left:${o.x}%;width:${o.w}%;top:${b[0]}%;height:${b[1]}%;` +
           `background:rgba(${c},.30);box-shadow:0 0 0 2px rgba(${c},.75) inset`;
       });
-      ph.style.top = o.sy[0] + '%'; ph.style.height = o.sy[1] + '%';
       const r = sys.getBoundingClientRect();
       if (r.top < 90 || r.bottom > innerHeight - 16 || r.left < 0 || r.right > innerWidth)
         sys.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
     }
-    const f = Math.min(1, Math.max(0, (t - D.times[m - 1]) / (D.times[m] - D.times[m - 1])));
-    ph.style.left = (o.x + o.w * f) + '%';
     upd();
   }
 
