@@ -5,7 +5,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = './vendor/pdf.worker.min.mjs';
 const $ = id => document.getElementById(id);
 const PALETTE = ["#e0483c", "#1f9d55", "#2f6fe0", "#8b5cf6", "#e08a1e", "#0d9488", "#d6336c", "#4b5563"];
 const AUDIO_RE = /\.(mp3|m4a|aac|wav|ogg|flac|aif|aiff)$/i;
-const ACC_RE = /^(반주|연주|MR|AR|acc|accomp\w*|piano|inst\w*|backing|karaoke)$/i;
+// 파일 이름에 이런 말이 들어 있으면 반주로 자동 인식 (아니면 화면에서 골라도 됩니다)
+const ACC_RE = /(반주|연주|피아노|엠알|instrumental|instrument|backing|karaoke|accomp|piano|^mr$|^ar$|^acc$|^inst$)/i;
 const SCALE = 150 / 72;                       // 150dpi 상당
 
 const F = { pdf: null, score: null, audio: {} };   // 올린 파일
@@ -50,8 +51,21 @@ function paintFiles() {
   if (!ok) return;
   if (!$('title').value) $('title').value = F.pdf.name.replace(/\.pdf$/i, '').replace(/[_]+/g, ' ');
   if (!$('sid').value) $('sid').value = slug($('title').value);
-  if (!$('acc').value) { const a = names.find(n => ACC_RE.test(n)); if (a) $('acc').value = a; }
-  if (!$('order').value) $('order').value = names.filter(n => n !== $('acc').value).join(',');
+  // 반주 고르는 칸 채우기 (이름이 무엇이든 목록에서 고르면 됩니다)
+  const accSel = $('acc'), want = accSel.dataset.want || accSel.value;
+  accSel.innerHTML = '<option value="">없음</option>' +
+    names.map(n => `<option value="${n}">${n}</option>`).join('');
+  accSel.value = names.includes(want) ? want
+    : (names.find(n => ACC_RE.test(n)) || '');
+  accSel.dataset.want = '';
+  if (!$('order').value) $('order').value = names.filter(n => n !== accSel.value).join(',');
+  accSel.onchange = () => {
+    const a = accSel.value;
+    let list = $('order').value.split(',').map(x => x.trim()).filter(Boolean);
+    list = list.filter(n => n !== a);
+    names.forEach(n => { if (n !== a && !list.includes(n)) list.push(n); });
+    $('order').value = list.join(',');
+  };
   $('title').oninput = () => { $('sid').value = slug($('title').value); };
 }
 
@@ -679,7 +693,7 @@ $('pub').onclick = async () => {
   $('subtitle').value = info.subtitle || '';
   $('sid').value = id;
   $('order').value = (info.parts || []).map(p => p.id || p).join(',');
-  $('acc').value = info.accomp || '';
+  $('acc').dataset.want = info.accomp || '';
   $('title').oninput = null;                       // 아이디가 바뀌지 않도록 고정
   const note = document.createElement('p');
   note.className = 'dim';

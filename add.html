@@ -13,7 +13,7 @@
 <body>
 <div class="top"><div class="inner"><div class="brand">
   <img src="logo-badge.png" width="46" height="46" alt="">
-  <div><h1>곡 추가</h1><p>악보 PDF와 파트별 음원을 올리면 앱이 알아서 마디를 찾아 맞춰줍니다 <span style="opacity:.6">· v2026.08.14-g</span></p></div>
+  <div><h1>곡 추가</h1><p>악보 PDF와 파트별 음원을 올리면 앱이 알아서 마디를 찾아 맞춰줍니다 <span style="opacity:.6">· v2026.08.14-h</span></p></div>
   <a href="index.html" class="btn ghost" style="margin-left:auto">곡 목록</a>
 </div></div></div>
 
@@ -24,7 +24,7 @@
     <h3><span class="num">1</span> 파일 올리기</h3>
     <div id="drop" class="drop">
       <p><b>여기로 파일을 끌어다 놓거나</b> 눌러서 선택하세요</p>
-      <p class="dim">악보 PDF 1개 · 파트별 음원(파일명에 <code>[파트이름]</code>) · 반주 음원(<code>[반주]</code>, 선택) · MuseScore 파일(.mscz, 선택)</p>
+      <p class="dim">악보 PDF 1개 · 파트별 음원(파일명에 <code>[파트이름]</code>) · 반주 음원(선택) · MuseScore 파일(.mscz, 선택)<br>반주는 <code>[반주]</code>·<code>[MR]</code>·<code>[Piano]</code> 같은 이름이면 자동으로 잡히고, 아니면 아래에서 골라주세요</p>
       <input id="files" type="file" multiple accept=".pdf,.mscz,.mscx,audio/*" hidden>
     </div>
     <div id="filelist" class="files"></div>
@@ -38,7 +38,8 @@
       <label>부제 <span class="dim">(선택)</span><input id="subtitle" type="text" placeholder="예) 울림 어린이합창단"></label>
       <label>주소용 아이디<input id="sid" type="text" placeholder="when-you-believe"></label>
       <label>파트 순서 <span class="dim">(악보 위 → 아래)</span><input id="order" type="text" placeholder="Children,Mum,Dad"></label>
-      <label>반주 음원 <span class="dim">(선택 · 파트와 함께 깔립니다)</span><input id="acc" type="text" placeholder="예) 반주"></label>
+      <label>반주 음원 <span class="dim">(선택 · 파트와 함께 깔립니다)</span>
+        <select id="acc"><option value="">없음</option></select></label>
     </div>
   </section>
 
