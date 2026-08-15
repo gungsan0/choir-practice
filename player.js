@@ -12,7 +12,7 @@
   let loopA = null, loopB = null, multi = false, loopMode = false;
   let accId = null, accOn = false, accVol = 0.6;   // 반주
   let syncOff = 0;                                 // 악보 싱크 미세조정(초)
-  const ovs = [], sys = div('sys'), ph = div('ph'), lmk = div('loopmark'), hls = {};
+  const ovs = [], sys = div('sys'), lmk = div('loopmark'), hls = {};
 
   function div(c) { const d = document.createElement('div'); d.className = c; return d; }
   const dur = () => D.times[D.times.length - 1];
@@ -109,16 +109,37 @@
      서비스워커가 아직 페이지를 맡기 전이어도 곡이 열리도록 하기 위함. */
   let fromCache = false;
   const abs = u => new URL(u, location.href).href;
+
+  /* 한글 파일명은 자모가 합쳐진 형태(NFC)와 분리된 형태(NFD)가 있고,
+     맥에서 올린 파일은 분리된 형태로 저장됩니다. song.json 에 적힌 파트 이름과
+     형태가 달라도 곡이 열리도록, 안 되면 반대 형태로 한 번 더 찾아봅니다. */
+  const altForm = u => { const a = u.normalize('NFC'), b = u.normalize('NFD'); return u === a ? (b === a ? null : b) : a; };
+  const forms = u => { const alt = altForm(u); return alt ? [u, alt] : [u]; };
+  const fixed = new Map();                       // 원래 주소 → 실제로 열리는 주소
+  async function realURL(url) {                  // 통째로 받지 않고 주소만 확인
+    if (fixed.has(url)) return fixed.get(url);
+    const cands = forms(url);
+    let out = url;
+    if (cands.length > 1) {
+      const ok = async u => { try { const r = await fetch(u, { method: 'HEAD' }); return !!(r && r.ok); } catch (e) { return false; } };
+      if (!(await ok(url)) && await ok(cands[1])) out = cands[1];
+    }
+    fixed.set(url, out);
+    return out;
+  }
   async function getAsset(url) {
-    try { const r = await fetch(url); if (r && r.ok) return r; } catch (e) { }
-    try {
-      const hit = await caches.match(abs(url));
-      if (hit) { fromCache = true; return hit; }
-    } catch (e) { }
+    const cands = forms(url);
+    for (const u of cands) { try { const r = await fetch(u); if (r && r.ok) return r; } catch (e) { } }
+    for (const u of cands) {
+      try {
+        const hit = await caches.match(abs(u));
+        if (hit) { fromCache = true; return hit; }
+      } catch (e) { }
+    }
     return null;
   }
   async function assetURL(url) {                 // <img>·<audio> 에 넣을 주소
-    if (!fromCache) return url;
+    if (!fromCache) return realURL(url);
     const r = await getAsset(url);
     return r ? URL.createObjectURL(await r.blob()) : url;
   }
@@ -169,7 +190,9 @@
       assetURL(base + p.id + '.mp3').then(u => { a.src = u; });
     });
     EL.use(sel[0]);
-    addEventListener('load', () => setTimeout(() => { if (!fromCache) parts.slice(1).forEach(p => fetch(base + p.id + '.mp3').catch(() => { })); }, 2000));
+    addEventListener('load', () => setTimeout(() => {
+      if (!fromCache) parts.slice(1).forEach(p => realURL(base + p.id + '.mp3').then(u => fetch(u)).catch(() => { }));
+    }, 2000));
 
     wire(); fit(); render(true);
     if (isLocal()) { $('dl').textContent = '✓ 이 기기에 저장됨'; $('dl').classList.add('act'); }
@@ -323,10 +346,12 @@
     if (isLocal()) { btn.textContent = '✓ 이 기기에 저장됨'; btn.classList.add('act'); return; }
     btn.disabled = true; btn.textContent = '저장 중…';
     try {
-      const urls = [base + 'song.json', 'player.html', 'player.js', 'app.css', 'index.html']
-        .concat(Array.from({ length: D.pages }, (_, i) => base + 'p' + (i + 1) + '.webp'))
-        .concat(parts.map(p => base + p.id + '.mp3'))
-        .concat(accId ? [base + accId + '.mp3'] : []);
+      const urls = await Promise.all(
+        [base + 'song.json', 'player.html', 'player.js', 'app.css', 'index.html']
+          .concat(Array.from({ length: D.pages }, (_, i) => base + 'p' + (i + 1) + '.webp'))
+          .concat(parts.map(p => base + p.id + '.mp3'))
+          .concat(accId ? [base + accId + '.mp3'] : [])
+          .map(u => realURL(u)));
       await (await caches.open('songs-' + songId)).addAll(urls);
       btn.textContent = '✓ 저장됨'; btn.classList.add('act');
     } catch (e) { btn.textContent = '저장 실패'; }
@@ -343,7 +368,7 @@
     $('mn').textContent = '마디 ' + m;
     if (m !== cur || force) {
       cur = m;
-      ovs[o.pg].append(sys, ph);
+      ovs[o.pg].append(sys);
       sys.style.cssText = `left:${o.x}%;width:${o.w}%;top:${o.sy[0]}%;height:${o.sy[1]}%`;
       parts.forEach((p, i) => {
         const el = hls[p.id];
@@ -354,13 +379,10 @@
         el.style.cssText = `left:${o.x}%;width:${o.w}%;top:${b[0]}%;height:${b[1]}%;` +
           `background:rgba(${c},.30);box-shadow:0 0 0 2px rgba(${c},.75) inset`;
       });
-      ph.style.top = o.sy[0] + '%'; ph.style.height = o.sy[1] + '%';
       const r = sys.getBoundingClientRect();
       if (r.top < 90 || r.bottom > innerHeight - 16 || r.left < 0 || r.right > innerWidth)
         sys.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
     }
-    const f = Math.min(1, Math.max(0, (t - D.times[m - 1]) / (D.times[m] - D.times[m - 1])));
-    ph.style.left = (o.x + o.w * f) + '%';
     upd();
   }
 

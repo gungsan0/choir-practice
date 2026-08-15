@@ -29,6 +29,9 @@ button{font-family:inherit}
 .chip{font-size:11.5px;font-weight:650;color:#fff;padding:3px 9px;border-radius:999px}
 .meta{font-size:11.5px;color:#98a0ac;margin-left:auto;white-space:nowrap}
 .saved{font-size:11.5px;color:#1f9d55;font-weight:650}
+.scope{font-size:11.5px;font-weight:650;white-space:nowrap}
+.scope.pub{color:#2f6fe0}
+.scope.only{color:#e08a1e}
 .empty{background:#fff;border:1px dashed #d5dae1;border-radius:12px;padding:26px 18px;color:var(--muted);font-size:13.5px;line-height:1.8}
 .note{margin-top:26px;font-size:11.5px;color:#98a0ac;line-height:1.8}
 
@@ -65,7 +68,6 @@ main{max-width:940px;margin:16px auto 70px;padding:0 10px;transition:max-width .
 .hit:hover{background:rgba(0,0,0,.05)}
 .hl{position:absolute;border-radius:4px;pointer-events:none;mix-blend-mode:multiply}
 .sys{position:absolute;pointer-events:none;border:1.5px solid rgba(0,0,0,.28);border-radius:5px;background:rgba(0,0,0,.03)}
-.ph{position:absolute;width:2px;background:rgba(0,0,0,.55);pointer-events:none}
 .loopmark{position:absolute;background:rgba(255,190,0,.28);pointer-events:none;border-radius:3px}
 .hint{max-width:940px;margin:14px auto 0;padding:10px 14px;font-size:12.5px;color:#5c6472;background:#fff;
   border:1px solid #e3e6ea;border-radius:8px;line-height:1.8}

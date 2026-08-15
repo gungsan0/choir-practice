@@ -18,6 +18,10 @@ let detOnsets = null;                              // 음원에서 찾은 음 �
 
 const prog = t => { $('prog').textContent = t; };
 const slug = s => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'song';
+/* 파트 이름(=음원 파일명)은 항상 자모가 합쳐진 형태로 통일합니다.
+   맥에서 고른 파일은 이름이 분리된 형태(NFD)로 들어와, 그대로 저장하면
+   플레이어가 만든 주소와 어긋나 음원을 못 찾습니다. */
+const nfc = s => (s || '').normalize('NFC');
 
 /* ───────────────────────── 파일 받기 */
 const drop = $('drop'), input = $('files');
@@ -33,7 +37,7 @@ function take(list) {
     else if (/\.(mscz|mscx)$/i.test(f.name)) F.score = f;
     else if (AUDIO_RE.test(f.name)) {
       const m = f.name.match(/\[([^\]]+)\]/);
-      F.audio[m ? m[1].trim() : f.name.replace(AUDIO_RE, '')] = f;
+      F.audio[nfc(m ? m[1].trim() : f.name.replace(AUDIO_RE, ''))] = f;
     }
   }
   paintFiles();
@@ -61,7 +65,7 @@ function paintFiles() {
   if (!$('order').value) $('order').value = names.filter(n => n !== accSel.value).join(',');
   accSel.onchange = () => {
     const a = accSel.value;
-    let list = $('order').value.split(',').map(x => x.trim()).filter(Boolean);
+    let list = $('order').value.split(',').map(x => nfc(x.trim())).filter(Boolean);
     list = list.filter(n => n !== a);
     names.forEach(n => { if (n !== a && !list.includes(n)) list.push(n); });
     $('order').value = list.join(',');
@@ -441,8 +445,8 @@ async function run(fresh) {
       SC = F.score ? await readScore(F.score) : null;
       detOnsets = null;
     }
-    const accId = $('acc').value.trim();
-    const order = $('order').value.split(',').map(s => s.trim()).filter(Boolean).filter(p => p !== accId);
+    const accId = nfc($('acc').value.trim());
+    const order = $('order').value.split(',').map(s => nfc(s.trim())).filter(Boolean).filter(p => p !== accId);
     const missing = order.filter(p => !F.audio[p]);
     if (missing.length) throw new Error('음원이 없는 파트: ' + missing.join(', '));
     if (accId && !F.audio[accId]) throw new Error('반주 음원을 찾지 못했습니다: ' + accId);
@@ -674,7 +678,7 @@ $('ghsync').onclick = async () => {
       catch (e) { continue; }
       songs.push({
         id: j.id || d.name, title: j.title || d.name, subtitle: j.subtitle || '',
-        parts: (j.parts || []).map(p => p.id || p), accomp: j.accomp || null, pages: j.pages,
+        parts: (j.parts || []).map(p => nfc(p.id || p)), accomp: nfc(j.accomp) || null, pages: j.pages,
         duration: j.duration, measures: (j.measures || []).length
       });
     }
@@ -719,8 +723,8 @@ $('pub').onclick = async () => {
   $('title').value = info.title || id;
   $('subtitle').value = info.subtitle || '';
   $('sid').value = id;
-  $('order').value = (info.parts || []).map(p => p.id || p).join(',');
-  $('acc').dataset.want = info.accomp || '';
+  $('order').value = (info.parts || []).map(p => nfc(p.id || p)).join(',');
+  $('acc').dataset.want = nfc(info.accomp) || '';
   $('title').oninput = null;                       // 아이디가 바뀌지 않도록 고정
   const note = document.createElement('p');
   note.className = 'dim';

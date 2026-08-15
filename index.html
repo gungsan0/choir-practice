@@ -64,7 +64,10 @@ function render(){
       +(s.accomp?`<span class="chip" style="background:#6b7280">🎹 ${s.accomp}</span>`:'');
     a.innerHTML=`<h2>${s.title}</h2>`+(s.subtitle?`<p class="sub">${s.subtitle}</p>`:'')+
       `<div class="chips">${chips}
-        ${s.local?'<span class="saved">● 이 기기에 추가함</span>':(cached.has(s.id)?'<span class="saved">● 오프라인 저장됨</span>':'')}
+        ${s.local
+          ? '<span class="scope only" title="아직 공개하지 않아 이 기기에서만 보입니다. 다른 사람에게도 보이게 하려면 다시 만들기 → 모두에게 공개를 눌러주세요.">📱 이 기기에만 있음</span>'
+          : '<span class="scope pub" title="저장소에 올라가 있어 모든 사람에게 보입니다.">🌐 모두에게 공개</span>'}
+        ${!s.local&&cached.has(s.id)?'<span class="saved">● 오프라인 저장됨</span>':''}
         <span class="meta">${s.measures?s.measures+'마디 · ':''}${s.pages?s.pages+'쪽 · ':''}${s.duration?fmt(s.duration):''}</span>
         <button class="del" data-fix="${s.id}" title="악보 인식을 다시 해서 이 곡을 덮어씁니다">다시 만들기</button>
         <button class="del danger" data-del="${s.id}" title="${s.local?'이 기기에서 삭제':'모두에게서 삭제 (GitHub)'}">삭제</button>
@@ -89,8 +92,10 @@ function render(){
   document.getElementById('note').innerHTML =
     '<b>＋ 곡 추가</b>에서 악보 PDF와 파트별 음원을 올리면 앱이 마디를 찾아 자동으로 맞춰줍니다. ' +
     '곡 하나를 열어 <b>오프라인 저장</b>을 누르면 인터넷 없이도 연습할 수 있어요. ' +
+    '<b class="scope pub">🌐 모두에게 공개</b> 는 저장소에 올라가 모든 사람이 볼 수 있는 곡, ' +
+    '<b class="scope only">📱 이 기기에만 있음</b> 은 아직 공개하지 않아 이 기기에서만 보이는 곡입니다. ' +
     '휴대폰에서는 공유 → 홈 화면에 추가하면 앱처럼 열립니다.' +
-    ' <span style="opacity:.7">앱 버전 2026.08.15-b</span> · <a href="#" id="hard" style="text-decoration:underline">앱 새로고침</a>';
+    ' <span style="opacity:.7">앱 버전 2026.08.15-c</span> · <a href="#" id="hard" style="text-decoration:underline">앱 새로고침</a>';
   document.getElementById('hard').onclick = async e => {
     e.preventDefault();
     try {
