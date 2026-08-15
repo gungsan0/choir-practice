@@ -13,14 +13,23 @@
 <body>
 <div class="top"><div class="inner"><div class="brand">
   <img src="logo-badge.png" width="46" height="46" alt="">
-  <div><h1>곡 추가</h1><p>악보 PDF와 파트별 음원을 올리면 앱이 알아서 마디를 찾아 맞춰줍니다 <span style="opacity:.6">· v2026.08.15-b</span></p></div>
+  <div><h1>곡 추가</h1><p>악보 PDF와 파트별 음원을 올리면 앱이 알아서 마디를 찾아 맞춰줍니다 <span style="opacity:.6">· v2026.08.15-c</span></p></div>
   <a href="index.html" class="btn ghost" style="margin-left:auto">곡 목록</a>
 </div></div></div>
 
 <div class="wrap">
 
+  <!-- 관리자가 아닐 때 보이는 안내 -->
+  <section class="box" id="lock" hidden>
+    <h3>🔒 관리자 전용</h3>
+    <p class="dim">곡 추가·공개·삭제는 이 앱의 GitHub 저장소를 관리하는 사람만 할 수 있습니다.
+      아래 <b>GitHub 연결 설정</b>에 저장소와 토큰을 입력하면 곡 추가 화면이 열립니다.
+      토큰은 이 브라우저에만 저장되고 서버로 보내지 않으므로, 기기마다 한 번씩 입력해야 합니다.<br>
+      연습만 하실 분은 <a href="index.html" style="text-decoration:underline">곡 목록</a>으로 돌아가세요.</p>
+  </section>
+
   <!-- 1. 파일 -->
-  <section class="box">
+  <section class="box" data-owner hidden>
     <h3><span class="num">1</span> 파일 올리기</h3>
     <div id="drop" class="drop">
       <p><b>여기로 파일을 끌어다 놓거나</b> 눌러서 선택하세요</p>

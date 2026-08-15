@@ -639,10 +639,21 @@ const GH = {
   }
 };
 
+/* 저장소와 토큰이 들어 있는 기기에서만 곡 추가 화면을 엽니다.
+   실제 권한은 GitHub 토큰이 쥐고 있어 토큰 없이는 어차피 공개·삭제가 되지 않습니다. */
+const isOwner = () => { const c = GH.cfg; return !!(c.repo && c.token); };
+function applyLock() {
+  const ok = isOwner();
+  $('lock').hidden = ok;
+  document.querySelectorAll('[data-owner]').forEach(el => { el.hidden = !ok; });
+  if (!ok) $('ghbox').open = true;
+}
+
 for (const [k, el] of Object.entries({ repo: 'ghrepo', branch: 'ghbranch', token: 'ghtoken' })) {
   $(el).value = GH.cfg[k] || (k === 'branch' ? 'main' : '');
-  $(el).oninput = () => { GH.cfg = { ...GH.cfg, [k]: $(el).value.trim() }; };
+  $(el).oninput = () => { GH.cfg = { ...GH.cfg, [k]: $(el).value.trim() }; applyLock(); };
 }
+applyLock();
 $('ghtest').onclick = async () => {
   const c = GH.cfg;
   if (!c.repo || !c.token) { msg('저장소와 토큰을 모두 입력해주세요. (지금: 저장소 ' + (c.repo ? '“' + c.repo + '”' : '없음') + ' / 토큰 ' + (c.token ? '입력됨' : '없음') + ')'); return; }
@@ -715,7 +726,7 @@ $('pub').onclick = async () => {
 /* 기존 곡 다시 만들기 — 같은 아이디로 저장하면 덮어써집니다 */
 (async () => {
   const id = new URLSearchParams(location.search).get('redo');
-  if (!id) return;
+  if (!id || !isOwner()) return;
   let info = null;
   try { info = await (await fetch('songs/' + id + '/song.json')).json(); } catch (e) { }
   if (!info) { try { info = (JSON.parse(localStorage.getItem('localSongs') || '[]')).find(s => s.id === id); } catch (e) { } }

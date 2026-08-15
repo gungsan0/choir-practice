@@ -20,7 +20,7 @@
 <div class="wrap">
   <div class="toolbar">
     <input class="search" id="q" type="search" placeholder="곡 검색" autocomplete="off">
-    <a class="add" href="add.html">＋ 곡 추가</a>
+    <a class="add" href="add.html" id="addbtn" hidden>＋ 곡 추가</a>
   </div>
   <div class="list" id="list"></div>
   <div class="note" id="note"></div>
@@ -30,6 +30,12 @@
 const COLORS=["#e0483c","#1f9d55","#2f6fe0","#8b5cf6","#e08a1e","#0d9488","#d6336c","#4b5563"];
 const fmt=s=>Math.floor(s/60)+'분 '+String(Math.round(s%60)).padStart(2,'0')+'초';
 let songs=[], cached=new Set();
+
+/* 곡 추가·공개·삭제는 저장소 관리자만 — 실제 권한은 GitHub 토큰이 쥐고 있고(토큰 없이는
+   GitHub이 거절합니다), 여기서는 그에 맞춰 관리용 버튼을 감춥니다. */
+const isOwner=()=>{ try{ const c=JSON.parse(localStorage.getItem('gh')||'{}'); return !!(c.repo&&c.token); }catch(e){ return false; } };
+const owner=isOwner();
+document.getElementById('addbtn').hidden=!owner;
 
 async function cachedIds(){
   if(!('caches' in window)) return new Set();
@@ -54,7 +60,9 @@ function render(){
   if(!rows.length){
     list.innerHTML='<div class="empty">'+(songs.length
       ? '검색 결과가 없습니다.'
-      : '아직 등록된 곡이 없습니다.<br><b>＋ 곡 추가</b> 를 눌러 악보 PDF와 파트별 음원을 올려보세요.')+'</div>';
+      : (owner
+        ? '아직 등록된 곡이 없습니다.<br><b>＋ 곡 추가</b> 를 눌러 악보 PDF와 파트별 음원을 올려보세요.'
+        : '아직 등록된 곡이 없습니다.'))+'</div>';
     return;
   }
   rows.forEach(s=>{
@@ -69,8 +77,8 @@ function render(){
           : '<span class="scope pub" title="저장소에 올라가 있어 모든 사람에게 보입니다.">🌐 모두에게 공개</span>'}
         ${!s.local&&cached.has(s.id)?'<span class="saved">● 오프라인 저장됨</span>':''}
         <span class="meta">${s.measures?s.measures+'마디 · ':''}${s.pages?s.pages+'쪽 · ':''}${s.duration?fmt(s.duration):''}</span>
-        <button class="del" data-fix="${s.id}" title="악보 인식을 다시 해서 이 곡을 덮어씁니다">다시 만들기</button>
-        <button class="del danger" data-del="${s.id}" title="${s.local?'이 기기에서 삭제':'모두에게서 삭제 (GitHub)'}">삭제</button>
+        ${owner?`<button class="del" data-fix="${s.id}" title="악보 인식을 다시 해서 이 곡을 덮어씁니다">다시 만들기</button>`:''}
+        ${owner||s.local?`<button class="del danger" data-del="${s.id}" title="${s.local?'이 기기에서 삭제':'모두에게서 삭제 (GitHub)'}">삭제</button>`:''}
       </div>`;
     list.appendChild(a);
   });
@@ -90,12 +98,15 @@ function render(){
   cached=await cachedIds();
   render();
   document.getElementById('note').innerHTML =
-    '<b>＋ 곡 추가</b>에서 악보 PDF와 파트별 음원을 올리면 앱이 마디를 찾아 자동으로 맞춰줍니다. ' +
+    (owner
+      ? '<b>＋ 곡 추가</b>에서 악보 PDF와 파트별 음원을 올리면 앱이 마디를 찾아 자동으로 맞춰줍니다. ' +
+        '<b class="scope pub">🌐 모두에게 공개</b> 는 저장소에 올라가 모든 사람이 볼 수 있는 곡, ' +
+        '<b class="scope only">📱 이 기기에만 있음</b> 은 아직 공개하지 않아 이 기기에서만 보이는 곡입니다. '
+      : '곡 추가·수정·삭제는 이 앱을 관리하는 사람만 할 수 있습니다. ') +
     '곡 하나를 열어 <b>오프라인 저장</b>을 누르면 인터넷 없이도 연습할 수 있어요. ' +
-    '<b class="scope pub">🌐 모두에게 공개</b> 는 저장소에 올라가 모든 사람이 볼 수 있는 곡, ' +
-    '<b class="scope only">📱 이 기기에만 있음</b> 은 아직 공개하지 않아 이 기기에서만 보이는 곡입니다. ' +
     '휴대폰에서는 공유 → 홈 화면에 추가하면 앱처럼 열립니다.' +
-    ' <span style="opacity:.7">앱 버전 2026.08.15-c</span> · <a href="#" id="hard" style="text-decoration:underline">앱 새로고침</a>';
+    ' <span style="opacity:.7">앱 버전 2026.08.15-c</span> · <a href="#" id="hard" style="text-decoration:underline">앱 새로고침</a>' +
+    (owner ? '' : ' · <a href="add.html" style="opacity:.55">관리자</a>');
   document.getElementById('hard').onclick = async e => {
     e.preventDefault();
     try {
@@ -158,6 +169,7 @@ document.getElementById('list').addEventListener('click', async e=>{
   e.preventDefault(); e.stopPropagation();
 
   if(fix){
+    if(!owner) return;
     sessionStorage.setItem('redoSong', fix.dataset.fix);
     location.href='add.html?redo='+encodeURIComponent(fix.dataset.fix);
     return;
@@ -165,6 +177,7 @@ document.getElementById('list').addEventListener('click', async e=>{
 
   const id=del.dataset.del, s=songs.find(x=>x.id===id)||{};
   const say=t=>{ del.textContent=t; };
+  if(!s.local&&!owner) return;                 // 공개된 곡은 관리자만
   if(s.local){
     if(!confirm(`"${s.title}" 을(를) 이 기기에서 삭제할까요?`)) return;
     await removeLocal(id);

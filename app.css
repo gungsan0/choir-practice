@@ -2,6 +2,7 @@
   --bg:#f4f5f7; --panel:#15181d; --line:#2a2f39; --ink:#111; --muted:#6b7280;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}   /* .add 처럼 display 를 지정한 요소도 확실히 숨기기 위해 */
 html,body{overscroll-behavior-y:none}
 body{margin:0;background:var(--bg);color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",Segoe UI,sans-serif;
