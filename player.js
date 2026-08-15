@@ -10,6 +10,7 @@
 
   let D = null, parts = [], sel = [], els = {}, cur = -1, rate = 1;
   let loopA = null, loopB = null, multi = false, loopMode = false;
+  let accId = null, accOn = false, accVol = 0.6;   // 반주
   const ovs = [], sys = div('sys'), ph = div('ph'), lmk = div('loopmark'), hls = {};
 
   function div(c) { const d = document.createElement('div'); d.className = c; return d; }
@@ -38,12 +39,13 @@
   };
 
   const WA = {                                   // 여러 파트: Web Audio
-    ctx: null, buf: {}, src: [], gain: null, at: 0, off: 0, on: false,
+    ctx: null, buf: {}, src: [], gain: null, gacc: null, at: 0, off: 0, on: false,
     async ready(ids) {
       if (!this.ctx) {
         const C = window.AudioContext || window.webkitAudioContext;
         try { this.ctx = new C({ sampleRate: 32000 }); } catch (e) { this.ctx = new C(); }
         this.gain = this.ctx.createGain(); this.gain.connect(this.ctx.destination);
+        this.gacc = this.ctx.createGain(); this.gacc.connect(this.ctx.destination);
       }
       if (this.ctx.state === 'suspended') await this.ctx.resume();
       const need = ids.filter(id => !this.buf[id]);
@@ -67,16 +69,19 @@
       const ids = sel.filter(id => this.buf[id]);
       if (!ids.length) return;
       this.gain.gain.value = 1 / Math.sqrt(ids.length);
+      this.gacc.gain.value = accVol;
       const t0 = this.ctx.currentTime + 0.06;
-      this.src = ids.map(id => {
+      const mk = (id, node) => {
         const s = this.ctx.createBufferSource();
         s.buffer = this.buf[id]; s.playbackRate.value = rate;
-        s.connect(this.gain); s.start(t0, Math.min(this.off, s.buffer.duration - .01));
+        s.connect(node); s.start(t0, Math.min(this.off, s.buffer.duration - .01));
         return s;
-      });
+      };
+      this.src = ids.map(id => mk(id, this.gain));
+      if (accOn && accId && this.buf[accId]) this.src.push(mk(accId, this.gacc));
       this.at = t0; this.on = true;
     },
-    async play() { await this.ready(sel); this.start(); },
+    async play() { await this.ready(accOn && accId ? sel.concat([accId]) : sel); this.start(); },
     pause() { if (this.on) { const t = this.time; this.stop(); this.off = t; } },
     stop() { this.src.forEach(s => { try { s.stop(); } catch (e) { } }); this.src = []; this.on = false; },
     setRate(r) { if (this.on) { const t = this.time; this.stop(); this.off = t; rate = r; this.start(); } }
@@ -86,11 +91,12 @@
   const T = () => E.time;
   const setT = t => { E.time = Math.max(0, Math.min(t, dur())); };
 
+  const needsWA = () => sel.length > 1 || (accOn && !!accId);
   async function useEngine(next) {
     if (E === next) return;
     const t = T(), playing = !E.paused;
     E.stop(); E = next;
-    if (next === WA) { await WA.ready(sel); }
+    if (next === WA) { await WA.ready(accOn && accId ? sel.concat([accId]) : sel); }
     else EL.use(sel[0]);
     E.time = t;
     if (playing) await E.play();
@@ -154,6 +160,8 @@
       ovs[m.pg].appendChild(h);
     });
     parts.forEach(p => { hls[p.id] = div('hl'); });
+    accId = song.accomp || null;
+    if (accId) { $('acc').hidden = false; $('accvol').hidden = false; }
 
     parts.forEach((p, i) => {
       const a = new Audio(); a.preload = i === 0 ? 'auto' : 'metadata'; els[p.id] = a;
@@ -220,11 +228,12 @@
     $('mix').classList.toggle('act', multi);
     $('mix').textContent = multi ? '겹쳐 듣기 ON' : '겹쳐 듣기';
     document.querySelectorAll('[data-sp]').forEach(b => {
-      const off = sel.length > 1 && b.dataset.sp !== '1';
+      const off = needsWA() && b.dataset.sp !== '1';
       b.disabled = off; b.style.opacity = off ? .35 : 1;
-      b.title = off ? '여러 파트를 겹쳐 들을 때는 1배속만 지원합니다' : '';
+      b.title = off ? '반주를 깔거나 여러 파트를 겹쳐 들을 때는 1배속만 지원합니다' : '';
     });
-    if (sel.length > 1 && rate !== 1) setRate(1);
+    if (needsWA() && rate !== 1) setRate(1);
+    $('acc').classList.toggle('act', accOn);
   }
 
   async function pickPart(id) {
@@ -233,7 +242,7 @@
       else sel = parts.map(p => p.id).filter(p => sel.includes(p) || p === id);   // 악보 순서 유지
     } else sel = [id];
     paintParts();
-    if (sel.length > 1) { await useEngine(WA); if (!E.paused) { E.pause(); await E.play(); } }
+    if (needsWA()) { await useEngine(WA); if (!E.paused) { E.pause(); await E.play(); } }
     else {
       if (E === WA) await useEngine(EL);
       else { const t = T(), playing = !E.paused; E.pause(); EL.use(id); EL.time = t; if (playing) EL.play(); }
@@ -268,6 +277,16 @@
       else if (loopMode) clearLoop();
       else { loopMode = true; paintLoop(); }
     };
+    $('acc').onclick = async () => {
+      accOn = !accOn;
+      paintParts();
+      if (needsWA()) { await useEngine(WA); if (!E.paused) { E.pause(); await E.play(); } }
+      else if (E === WA) await useEngine(EL);
+    };
+    $('accvol').oninput = () => {
+      accVol = +$('accvol').value / 100;
+      if (WA.gacc) WA.gacc.gain.value = accVol;
+    };
     $('dl').onclick = saveOffline;
     $('rf').onclick = async () => {
       if (isLocal()) { alert('이 곡은 이 기기에서 추가한 곡이라 다시 받을 원본이 없습니다.\n곡 목록에서 “다시 만들기”를 눌러주세요.'); return; }
@@ -297,7 +316,8 @@
     try {
       const urls = [base + 'song.json', 'player.html', 'player.js', 'app.css', 'index.html']
         .concat(Array.from({ length: D.pages }, (_, i) => base + 'p' + (i + 1) + '.webp'))
-        .concat(parts.map(p => base + p.id + '.mp3'));
+        .concat(parts.map(p => base + p.id + '.mp3'))
+        .concat(accId ? [base + accId + '.mp3'] : []);
       await (await caches.open('songs-' + songId)).addAll(urls);
       btn.textContent = '✓ 저장됨'; btn.classList.add('act');
     } catch (e) { btn.textContent = '저장 실패'; }

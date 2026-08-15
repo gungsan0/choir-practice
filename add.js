@@ -5,6 +5,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = './vendor/pdf.worker.min.mjs';
 const $ = id => document.getElementById(id);
 const PALETTE = ["#e0483c", "#1f9d55", "#2f6fe0", "#8b5cf6", "#e08a1e", "#0d9488", "#d6336c", "#4b5563"];
 const AUDIO_RE = /\.(mp3|m4a|aac|wav|ogg|flac|aif|aiff)$/i;
+const ACC_RE = /^(반주|연주|MR|AR|acc|accomp\w*|piano|inst\w*|backing|karaoke)$/i;
 const SCALE = 150 / 72;                       // 150dpi 상당
 
 const F = { pdf: null, score: null, audio: {} };   // 올린 파일
@@ -49,7 +50,8 @@ function paintFiles() {
   if (!ok) return;
   if (!$('title').value) $('title').value = F.pdf.name.replace(/\.pdf$/i, '').replace(/[_]+/g, ' ');
   if (!$('sid').value) $('sid').value = slug($('title').value);
-  if (!$('order').value) $('order').value = names.join(',');
+  if (!$('acc').value) { const a = names.find(n => ACC_RE.test(n)); if (a) $('acc').value = a; }
+  if (!$('order').value) $('order').value = names.filter(n => n !== $('acc').value).join(',');
   $('title').oninput = () => { $('sid').value = slug($('title').value); };
 }
 
@@ -425,9 +427,11 @@ async function run(fresh) {
       SC = F.score ? await readScore(F.score) : null;
       detOnsets = null;
     }
-    const order = $('order').value.split(',').map(s => s.trim()).filter(Boolean);
+    const accId = $('acc').value.trim();
+    const order = $('order').value.split(',').map(s => s.trim()).filter(Boolean).filter(p => p !== accId);
     const missing = order.filter(p => !F.audio[p]);
     if (missing.length) throw new Error('음원이 없는 파트: ' + missing.join(', '));
+    if (accId && !F.audio[accId]) throw new Error('반주 음원을 찾지 못했습니다: ' + accId);
 
     prog('마디선을 찾는 중…');
     await new Promise(r => setTimeout(r, 20));
@@ -462,6 +466,7 @@ async function run(fresh) {
       id: slug($('sid').value), title: $('title').value.trim() || '제목 없음',
       subtitle: $('subtitle').value.trim(),
       parts: order.map((p, i) => ({ id: p, name: p, color: PALETTE[i % PALETTE.length] })),
+      accomp: accId || null,
       pages: PAGES.length, duration: +duration.toFixed(2), measures: meas, times
     };
 
@@ -471,7 +476,7 @@ async function run(fresh) {
       ['악보', PAGES.length + '쪽 · 한 단에 오선 ' + LAY.k + '개'],
       ['마디', meas.length + '개' + (SC ? (meas.length === SC.measures ? ' <b class="ok">✓ 악보 파일과 일치</b>'
         : ` <b class="warn">⚠ MuseScore 파일은 ${SC.measures}개</b>`) : '')],
-      ['파트', order.join(' → ')],
+      ['파트', order.join(' → ') + (accId ? ` <span class="dim">+ 반주 «${accId}»</span>` : '')],
       ['길이', Math.floor(duration / 60) + '분 ' + Math.round(duration % 60) + '초'],
       ['템포', bpm + ' BPM 시작' + (LAY.fit ? ` · 음원 대조 오차 ${LAY.fit.score.toFixed(3)}초`
         : (SC ? ' (직접 지정)' : ' — <b class="warn">악보에 적힌 템포를 입력하고 “다시 계산”을 눌러주세요</b>'
@@ -542,6 +547,7 @@ async function buildFiles() {
   for (let i = 0; i < PAGES.length; i++)
     out['p' + (i + 1) + '.webp'] = await new Promise(r => PAGES[i].toBlob(r, 'image/webp', .88));
   for (const p of SONG.parts) out[p.id + '.mp3'] = F.audio[p.id];
+  if (SONG.accomp) out[SONG.accomp + '.mp3'] = F.audio[SONG.accomp];
   return out;
 }
 
@@ -578,7 +584,7 @@ $('zip').onclick = async () => {
   $('savemsg').textContent = '내려받았습니다.';
 };
 
-const entry = () => ({ id: SONG.id, title: SONG.title, subtitle: SONG.subtitle, parts: SONG.parts.map(p => p.id), pages: SONG.pages, duration: SONG.duration, measures: SONG.measures.length });
+const entry = () => ({ id: SONG.id, title: SONG.title, subtitle: SONG.subtitle, parts: SONG.parts.map(p => p.id), accomp: SONG.accomp || null, pages: SONG.pages, duration: SONG.duration, measures: SONG.measures.length });
 
 /* ───────────────────────── GitHub 공개 */
 const GH = {
@@ -627,7 +633,7 @@ $('ghsync').onclick = async () => {
       catch (e) { continue; }
       songs.push({
         id: j.id || d.name, title: j.title || d.name, subtitle: j.subtitle || '',
-        parts: (j.parts || []).map(p => p.id || p), pages: j.pages,
+        parts: (j.parts || []).map(p => p.id || p), accomp: j.accomp || null, pages: j.pages,
         duration: j.duration, measures: (j.measures || []).length
       });
     }
@@ -673,6 +679,7 @@ $('pub').onclick = async () => {
   $('subtitle').value = info.subtitle || '';
   $('sid').value = id;
   $('order').value = (info.parts || []).map(p => p.id || p).join(',');
+  $('acc').value = info.accomp || '';
   $('title').oninput = null;                       // 아이디가 바뀌지 않도록 고정
   const note = document.createElement('p');
   note.className = 'dim';

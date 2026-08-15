@@ -1,5 +1,5 @@
 /* 울림 합창 연습실 — 오프라인 지원 */
-const SHELL = 'shell-2026.08.14-e';
+const SHELL = 'shell-2026.08.14-g';
 const FILES = ['./', 'index.html', 'player.html', 'player.js', 'app.css',
   'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable.png', 'logo-badge.png',
   'add.html', 'add.js', 'vendor/fflate.min.js', 'vendor/pdf.min.mjs', 'vendor/pdf.worker.min.mjs'];
@@ -64,6 +64,8 @@ self.addEventListener('fetch', e => {
   if (url.pathname.endsWith('songs/index.json') || url.pathname.endsWith('song.json')) {
     e.respondWith(
       fetch(req).then(r => {
+        if (!r || r.status !== 200)                     // 404 응답을 캐시에 덮어쓰지 않는다
+          return caches.match(req).then(hit => hit || r);
         const cp = r.clone();
         caches.open(cacheNameFor(url)).then(c => c.put(req, cp)).catch(() => { });
         return r;

@@ -18,6 +18,8 @@
     <h1 class="title" id="ttl">&nbsp;</h1>
     <div class="parts" id="parts"></div>
     <button class="btn" id="mix" title="두 파트 이상 겹쳐서 함께 듣기">겹쳐 듣기</button>
+    <button class="btn" id="acc" hidden title="반주를 함께 깔기">🎹 반주</button>
+    <input id="accvol" class="vol" type="range" min="0" max="100" value="60" hidden aria-label="반주 음량">
     <span class="mono" id="st"></span>
     <span class="tag" id="lp"></span>
   </div>
@@ -43,7 +45,7 @@
 <div class="hint">
   마디를 <b>클릭</b>하면 그 지점부터 재생 · <b>Shift+클릭</b> 두 번으로 구간 반복(A→B) 설정 ·
   <kbd>Space</kbd> 재생/정지 · <kbd>&larr;</kbd><kbd>&rarr;</kbd> 한 마디 이동 ·
-  <b>🔁 구간 반복</b>을 누른 뒤 시작·끝 마디를 차례로 누르면 그 구간만 반복됩니다 · <b>겹쳐 듣기</b>를 켜면 두 파트 이상을 동시에 들을 수 있어요
+  <b>🔁 구간 반복</b>을 누른 뒤 시작·끝 마디를 차례로 누르면 그 구간만 반복됩니다 · <b>🎹 반주</b>를 켜면 반주가 함께 깔립니다(옆 슬라이더로 음량 조절) · <b>겹쳐 듣기</b>를 켜면 두 파트 이상을 동시에 들을 수 있어요
 </div>
 <main id="main"></main>
 <footer id="foot"></footer>

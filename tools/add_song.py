@@ -6,6 +6,7 @@ add_song.py — 합창 연습실 앱에 새 곡을 추가하는 변환 도구
   * 악보 PDF                      : 필수
   * 파트별 강조 음원 mp3/wav/m4a  : 필수, 파일명에 [파트이름] 을 넣어주세요
                                     예) [Soprano] 나의 노래.mp3
+  * 반주 음원                     : 선택, [반주] 처럼 이름 붙이면 자동 인식 (--accomp 로 지정 가능)
   * MuseScore 파일(.mscz/.mscx)   : 선택. 있으면 마디 수·박자·템포를 정확히 읽어옵니다.
 
 사용법
@@ -400,6 +401,7 @@ def main():
     ap.add_argument("--title", help="화면에 보일 곡 제목")
     ap.add_argument("--subtitle", default="", help="부제/편곡자 등")
     ap.add_argument("--order", help="악보 위→아래 파트 순서 (쉼표로 구분)")
+    ap.add_argument("--accomp", help="반주 음원의 이름 (예: 반주). 파트가 아니라 배경으로 깔립니다")
     ap.add_argument("--tempo", type=float, help="첫 구간 BPM 직접 지정")
     ap.add_argument("--offset", type=float, help="1마디 시작 시각(초)")
     ap.add_argument("--dpi", type=int, default=150)
@@ -438,16 +440,21 @@ def main():
     score = read_mscore(mscore) if mscore else None
 
     # 파트 순서 정하기 (악보에서 위 → 아래)
+    ACC = ("반주", "연주", "mr", "ar", "acc", "piano", "inst", "backing", "karaoke")
+    accomp = a.accomp or next((k for k in tracks if k.strip().lower() in ACC or k.strip() in ACC), None)
+    if accomp and accomp not in tracks:
+        die(f"반주 음원을 찾지 못했습니다: {accomp}")
     if a.order:
         order = [s.strip() for s in a.order.split(",") if s.strip()]
     elif score:
         order = [p for p in score["parts"] if p in tracks]
     else:
         order = list(tracks)
+    order = [p for p in order if p != accomp]
     missing = [p for p in order if p not in tracks]
     if missing:
         die(f"음원이 없는 파트: {', '.join(missing)}  (--order 를 확인해주세요)")
-    extra = [p for p in tracks if p not in order]
+    extra = [p for p in tracks if p not in order and p != accomp]
     if extra:
         print(f"⚠ 순서에 없는 음원은 건너뜁니다: {', '.join(extra)}")
 
@@ -456,7 +463,7 @@ def main():
     dur = audio_duration(tracks[order[0]])
 
     print(f"• 곡: {title}  (id: {song_id})")
-    print(f"• 파트: {' → '.join(order)}")
+    print(f"• 파트: {' → '.join(order)}" + (f"  (+ 반주: {accomp})" if accomp else ""))
     print(f"• 음원 길이: {dur:.1f}초")
 
     work = Path(tempfile.mkdtemp())
@@ -494,6 +501,7 @@ def main():
         song = dict(
             id=song_id, title=title, subtitle=a.subtitle,
             parts=[dict(id=p, name=p, color=PALETTE[i % len(PALETTE)]) for i, p in enumerate(order)],
+            accomp=accomp,
             pages=len(pages), duration=round(dur, 2),
             measures=measures, times=times,
         )
@@ -511,7 +519,7 @@ def main():
         out.mkdir(parents=True, exist_ok=True)
         for i, f in enumerate(pages, 1):
             Image.open(f).convert("L").save(out / f"p{i}.webp", quality=88, method=6)
-        for p in order:
+        for p in (order + ([accomp] if accomp else [])):
             run(["ffmpeg", "-y", "-v", "error", "-i", str(tracks[p]),
                  "-ac", "1", "-c:a", "libmp3lame", "-b:a", a.bitrate, str(out / f"{p}.mp3")])
         (out / "song.json").write_text(json.dumps(song, ensure_ascii=False, separators=(",", ":")),
@@ -521,7 +529,7 @@ def main():
         idx_path = site / "songs" / "index.json"
         idx = json.loads(idx_path.read_text(encoding="utf-8")) if idx_path.exists() else {"songs": []}
         entry = dict(id=song_id, title=title, subtitle=a.subtitle,
-                     parts=order, pages=len(pages), duration=round(dur, 2), measures=n_meas)
+                     parts=order, accomp=accomp, pages=len(pages), duration=round(dur, 2), measures=n_meas)
         idx["songs"] = [s for s in idx["songs"] if s["id"] != song_id] + [entry]
         idx["songs"].sort(key=lambda s: s["title"])
         idx_path.write_text(json.dumps(idx, ensure_ascii=False, indent=2), encoding="utf-8")
