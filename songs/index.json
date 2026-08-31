@@ -1,19 +1,17 @@
 {
   "songs": [
     {
-      "id": "song-of-the-wind-show",
-      "title": "바람의 노래 Song of the Wind",
-      "subtitle": "",
+      "id": "amazing-arirang",
+      "title": "Amazing Arirang 악보",
+      "subtitle": "울림 어린이 합창단",
       "parts": [
-        "Soprano",
-        "Alto",
-        "Tenor",
-        "Bass"
+        "Amazing_Arirang Choir1",
+        "Amazing_Arirang Choir2"
       ],
-      "accomp": null,
-      "pages": 6,
-      "duration": 273.35,
-      "measures": 78
+      "accomp": "Amazing_Arirang 반주",
+      "pages": 3,
+      "duration": 372.92,
+      "measures": 135
     },
     {
       "id": "when-you-believe",
@@ -28,6 +26,21 @@
       "pages": 6,
       "duration": 262.5,
       "measures": 83
+    },
+    {
+      "id": "song-of-the-wind-show",
+      "title": "바람의 노래 Song of the Wind",
+      "subtitle": "",
+      "parts": [
+        "Soprano",
+        "Alto",
+        "Tenor",
+        "Bass"
+      ],
+      "accomp": null,
+      "pages": 6,
+      "duration": 273.35,
+      "measures": 78
     }
   ]
 }
