@@ -2,16 +2,16 @@
   "songs": [
     {
       "id": "amazing-arirang",
-      "title": "Amazing Arirang 악보",
+      "title": "Amazing Arirang",
       "subtitle": "울림 어린이 합창단",
       "parts": [
-        "Amazing_Arirang Choir1",
-        "Amazing_Arirang Choir2"
+        "Choir1",
+        "Choir2"
       ],
-      "accomp": "Amazing_Arirang 반주",
+      "accomp": "반주",
       "pages": 3,
       "duration": 372.92,
-      "measures": 135
+      "measures": 137
     },
     {
       "id": "when-you-believe",
