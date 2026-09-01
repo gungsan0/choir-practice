@@ -210,7 +210,25 @@ function barsOf(cols, W) {
     else { bars.push(Math.round(c.reduce((a, b) => a + b) / c.length)); c = [common[i]]; }
   }
   bars.push(Math.round(c.reduce((a, b) => a + b) / c.length));
-  return bars;
+  return dropGhostBars(bars);
+}
+
+/* 겹세로줄(더블 바라인)·종지선처럼 마디선 두 개가 아주 가깝게 그려진 경우,
+   앞의 클러스터링(tol)만으로는 한 마디선으로 합쳐지지 않아 그 사이에 폭이 거의 0인
+   "가짜 마디"가 하나 더 생긴다. 이웃 마디 폭에 비해 지나치게 좁은 간격은
+   진짜 마디 경계가 아니라고 보고 앞쪽 마디선에 흡수시킨다. */
+function dropGhostBars(bars) {
+  if (bars.length < 3) return bars;
+  const widths = bars.slice(1).map((b, i) => b - bars[i]);
+  const sorted = [...widths].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const minW = median * 0.3;                      // 정상 마디 폭의 30% 미만이면 유령 마디선으로 간주
+  const out = [bars[0]];
+  for (let i = 1; i < bars.length; i++) {
+    if (bars[i] - out[out.length - 1] < minW) continue;
+    out.push(bars[i]);
+  }
+  return out.length >= 2 ? out : bars;
 }
 
 /* 단(system) 나누기 — 왼쪽 시작 세로선(괄호/첫 마디선)이 그 단의 오선을 통째로 잇는 점을 이용한다.
