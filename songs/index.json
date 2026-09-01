@@ -1,19 +1,6 @@
 {
   "songs": [
     {
-      "id": "amazing-arirang",
-      "title": "Amazing Arirang",
-      "subtitle": "울림 어린이 합창단",
-      "parts": [
-        "Choir1",
-        "Choir2"
-      ],
-      "accomp": "반주",
-      "pages": 3,
-      "duration": 372.92,
-      "measures": 137
-    },
-    {
       "id": "when-you-believe",
       "title": "When You Believe",
       "subtitle": "울림 어린이합창단",
