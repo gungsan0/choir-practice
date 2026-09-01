@@ -272,22 +272,49 @@ def detect_layout(pdf, workdir, dpi, staves_per_system=None, expect_measures=Non
         h = sysv[0][-1] - sysv[0][0]
         need = bot - top + 1
         dens = a[top:bot + 1, :].sum(0) / need
-        full = dens >= 0.95
         gap = max(3, int(round(h / 9)))
+        # 겹세로줄(더블 바라인 -- 박자표가 바뀌는 자리 등)은 아주 가느다란 두 줄이 3~4px
+        # 간격으로 붙어 있다. 그 좁은 빈 칸 때문에 두 줄 다 "옆이 안 비었다"며 걸러지던
+        # 문제가 있어, 짧은 빈 칸(bridge 이내)은 건너뛰어 두 줄을 한 마디선으로 이어붙인다.
+        bridge = max(2, int(round(h / 12)))
+
+        def is_dense(x):
+            return 0 <= x < W and dens[x] >= 0.95
+
         keep = set()
-        x = 0
-        while x < W:
-            if not full[x]:
-                x += 1
+        for x in range(W):
+            if dens[x] < 0.95:
                 continue
             l = x
-            while x < W and full[x]:
-                x += 1
-            r = x - 1
+            while True:
+                if is_dense(l - 1):
+                    l -= 1
+                    continue
+                found = None
+                for k in range(1, bridge + 1):
+                    if is_dense(l - 1 - k):
+                        found = l - 1 - k
+                        break
+                if found is None:
+                    break
+                l = found
+            r = x
+            while True:
+                if is_dense(r + 1):
+                    r += 1
+                    continue
+                found = None
+                for k in range(1, bridge + 1):
+                    if is_dense(r + 1 + k):
+                        found = r + 1 + k
+                        break
+                if found is None:
+                    break
+                r = found
             if r - l > max(6, h / 4):
                 continue
             if dens[max(0, l - gap)] <= 0.4 and dens[min(W - 1, r + gap)] <= 0.4:
-                keep.update(range(l, r + 1))
+                keep.add(x)
         return keep
 
     def bars_of(page, sysv):
