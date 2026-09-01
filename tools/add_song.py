@@ -169,32 +169,7 @@ def detect_layout(pdf, workdir, dpi, staves_per_system=None, expect_measures=Non
         if len(centers) % 5:
             die(f"{f.name}: 오선 줄 수가 5의 배수가 아닙니다({len(centers)}줄). --dpi 를 조정해보세요.")
         staff_list = [centers[i:i + 5] for i in range(0, len(centers), 5)]
-
-        # 오선마다 마디선 후보 열을 구한다.
-        # (오선 높이를 꽉 채우면서 양옆이 비어 있는 얇은 세로선만 = 12/8 같은 박자표·음표 기둥은 제외)
-        colsets = []
-        for st in staff_list:
-            y0, y1 = st[0], st[-1]
-            h = y1 - y0 + 1
-            dens = a[y0:y1 + 1, :].sum(0) / h
-            full = dens >= 0.95
-            gap = max(3, int(round(h / 9)))
-            keep = set()
-            x = 0
-            while x < W:
-                if not full[x]:
-                    x += 1
-                    continue
-                l = x
-                while x < W and full[x]:
-                    x += 1
-                r = x - 1
-                if r - l > max(6, h / 4):
-                    continue
-                if dens[max(0, l - gap)] <= 0.4 and dens[min(W - 1, r + gap)] <= 0.4:
-                    keep.update(range(l, r + 1))
-            colsets.append(keep)
-        pages_data.append(dict(staves=staff_list, cols=colsets, W=W, H=H, bin=a))
+        pages_data.append(dict(staves=staff_list, W=W, H=H, bin=a))
 
     def by_bracket(page):
         """단 시작의 세로선(괄호/첫 마디선)이 그 단의 오선을 통째로 잇는 것을 이용해 단을 나눈다."""
@@ -279,9 +254,37 @@ def detect_layout(pdf, workdir, dpi, staves_per_system=None, expect_measures=Non
             out.append(x)
         return out if len(out) >= 2 else bars
 
+    def barline_cols(page, sysv):
+        """마디선은 그 단(system)에 속한 오선을 전부 -- 오선과 오선 사이 빈 칸까지 -- 위에서
+        아래로 끊김없이 이어야 진짜다. 예전에는 오선마다 따로 마디선 후보를 찾고 x가 겹치는
+        것만 골랐는데, 우연히 여러 오선에서 같은 x에 음표 기둥·기호가 걸리면 마디선으로
+        잘못 인식했다. 그래서 단 전체 높이를 한 번에 검사해, 실제로 위에서 아래까지
+        이어진 세로줄만 인정한다."""
+        a, W = page["bin"], page["W"]
+        top, bot = sysv[0][0], sysv[-1][-1]
+        h = sysv[0][-1] - sysv[0][0]
+        need = bot - top + 1
+        dens = a[top:bot + 1, :].sum(0) / need
+        full = dens >= 0.95
+        gap = max(3, int(round(h / 9)))
+        keep = set()
+        x = 0
+        while x < W:
+            if not full[x]:
+                x += 1
+                continue
+            l = x
+            while x < W and full[x]:
+                x += 1
+            r = x - 1
+            if r - l > max(6, h / 4):
+                continue
+            if dens[max(0, l - gap)] <= 0.4 and dens[min(W - 1, r + gap)] <= 0.4:
+                keep.update(range(l, r + 1))
+        return keep
+
     def bars_of(page, sysv):
-        cols = [page["cols"][page["staves"].index(st)] for st in sysv]
-        common = sorted(set.intersection(*cols)) if cols else []
+        common = sorted(barline_cols(page, sysv))
         if len(common) < 2:
             return []
         tol = max(4, page["W"] // 90)
