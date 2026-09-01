@@ -165,6 +165,13 @@ def detect_layout(pdf, workdir, dpi, staves_per_system=None, expect_measures=Non
                 groups.append(cur)
                 cur = [i]
         groups.append(cur)
+        # 오선은 가느다란 한 줄이다. 16분음표 같은 빠른 리듬이 이어질 때 겹빔(beam)이
+        # 오선 위에서 페이지 폭의 40%를 넘게 뭉치면, 두께가 여러 줄에 걸친 "굵은 띠"인데도
+        # 오선으로 오인될 수 있다. 굵은 띠는 제외하고 가느다란 줄만 남긴다.
+        thickness = sorted(len(g) for g in groups)
+        median = thickness[len(thickness) // 2] if thickness else 1
+        cap = max(2, median + 2)
+        groups = [g for g in groups if len(g) <= cap]
         centers = [int(sum(g) / len(g)) for g in groups]
         if len(centers) % 5:
             die(f"{f.name}: 오선 줄 수가 5의 배수가 아닙니다({len(centers)}줄). --dpi 를 조정해보세요.")
