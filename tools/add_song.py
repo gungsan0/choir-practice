@@ -262,6 +262,23 @@ def detect_layout(pdf, workdir, dpi, staves_per_system=None, expect_measures=Non
             return b
         return by_gaps(sl)
 
+    def drop_ghost_bars(bars):
+        """겹세로줄(더블 바라인)·종지선처럼 마디선 두 개가 아주 가깝게 그려진 경우,
+        앞의 클러스터링(tol)만으로는 한 마디선으로 합쳐지지 않아 그 사이에 폭이 거의 0인
+        "가짜 마디"가 하나 더 생긴다. 이웃 마디 폭에 비해 지나치게 좁은 간격은
+        진짜 마디 경계가 아니라고 보고 앞쪽 마디선에 흡수시킨다."""
+        if len(bars) < 3:
+            return bars
+        widths = [b - a for a, b in zip(bars, bars[1:])]
+        median = sorted(widths)[len(widths) // 2]
+        min_w = median * 0.3  # 정상 마디 폭의 30% 미만이면 유령 마디선으로 간주
+        out = [bars[0]]
+        for x in bars[1:]:
+            if x - out[-1] < min_w:
+                continue
+            out.append(x)
+        return out if len(out) >= 2 else bars
+
     def bars_of(page, sysv):
         cols = [page["cols"][page["staves"].index(st)] for st in sysv]
         common = sorted(set.intersection(*cols)) if cols else []
@@ -276,7 +293,7 @@ def detect_layout(pdf, workdir, dpi, staves_per_system=None, expect_measures=Non
                 bars.append(round(sum(c) / len(c)))
                 c = [x]
         bars.append(round(sum(c) / len(c)))
-        return bars
+        return drop_ghost_bars(bars)
 
     def assemble(k):
         out, total = [], 0
