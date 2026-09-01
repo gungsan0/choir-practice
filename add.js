@@ -169,7 +169,14 @@ function staffLines({ bin, W, H }) {
     else { groups.push(cur); cur = [y]; }
   });
   if (cur.length) groups.push(cur);
-  const centers = groups.map(g => Math.round(g.reduce((a, b) => a + b) / g.length));
+  // 오선은 가느다란 한 줄이다. 16분음표 같은 빠른 리듬이 이어질 때 겹빔(beam)이
+  // 오선 위에서 페이지 폭의 40%를 넘게 뭉치면, 실제로는 두께가 여러 줄에 걸친
+  // "굵은 띠"인데도 오선으로 오인될 수 있다. 굵은 띠는 제외하고 가느다란 줄만 남긴다.
+  const thickness = groups.map(g => g.length).sort((a, b) => a - b);
+  const median = thickness[Math.floor(thickness.length / 2)] || 1;
+  const cap = Math.max(2, median + 2);
+  const thin = groups.filter(g => g.length <= cap);
+  const centers = thin.map(g => Math.round(g.reduce((a, b) => a + b) / g.length));
   if (centers.length % 5) return null;
   const staves = [];
   for (let i = 0; i < centers.length; i += 5) staves.push(centers.slice(i, i + 5));
