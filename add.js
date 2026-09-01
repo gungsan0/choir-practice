@@ -201,11 +201,28 @@ function barlineCols(pd, sysv) {
   // 12/8 같은 박자표·음표 기둥은 옆이 두꺼워서 걸러진다.
   const h = sysv[0][4] - sysv[0][0];
   const gap = Math.max(3, Math.round(h / 9));
+  // 겹세로줄(더블 바라인 — 박자표가 바뀌는 자리 등)은 아주 가느다란 두 줄이 3~4px
+  // 간격으로 붙어 있다. 그 좁은 빈 칸 때문에 두 줄 다 "옆이 안 비었다"며 걸러지던
+  // 문제가 있어, 짧은 빈 칸(bridge 이내)은 건너뛰어 두 줄을 한 마디선으로 이어붙인다.
+  const bridge = Math.max(2, Math.round(h / 12));
+  const isDense = x => x >= 0 && x < W && dens[x] >= .95;
   for (let x = 0; x < W; x++) {
     if (dens[x] < .95) { out[x] = 0; continue; }
     let l = x, r = x;
-    while (l > 0 && dens[l - 1] >= .95) l--;
-    while (r < W - 1 && dens[r + 1] >= .95) r++;
+    for (; ;) {
+      if (isDense(l - 1)) { l--; continue; }
+      let found = -1;
+      for (let k = 1; k <= bridge; k++) if (isDense(l - 1 - k)) { found = l - 1 - k; break; }
+      if (found < 0) break;
+      l = found;
+    }
+    for (; ;) {
+      if (isDense(r + 1)) { r++; continue; }
+      let found = -1;
+      for (let k = 1; k <= bridge; k++) if (isDense(r + 1 + k)) { found = r + 1 + k; break; }
+      if (found < 0) break;
+      r = found;
+    }
     if (r - l > Math.max(6, h / 4)) { out[x] = 0; continue; }   // 너무 두꺼운 덩어리
     const L = dens[Math.max(0, l - gap)], R = dens[Math.min(W - 1, r + gap)];
     out[x] = (L <= .4 && R <= .4) ? 1 : 0;
