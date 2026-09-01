@@ -176,16 +176,23 @@ function staffLines({ bin, W, H }) {
   return staves;
 }
 
-function colSets({ bin, W }, staff) {
-  const y0 = staff[0], y1 = staff[4], h = y1 - y0 + 1;
+/* 마디선은 그 단(system)에 속한 오선을 전부 — 오선과 오선 사이 빈 칸까지 — 위에서 아래로
+   끊김없이 이어야 진짜다. 예전에는 오선마다 따로 마디선 후보를 찾고 x가 겹치는 것만 골랐는데,
+   우연히 여러 오선에서 같은 x에 음표 기둥·기호가 걸리면 마디선으로 잘못 인식했다.
+   그래서 단 전체 높이를 한 번에 검사해, 실제로 위에서 아래까지 이어진 세로줄만 인정한다. */
+function barlineCols(pd, sysv) {
+  const { bin, W } = pd;
+  const top = sysv[0][0], bot = sysv[sysv.length - 1][4];
+  const need = bot - top + 1;
   const dens = new Float32Array(W), out = new Uint8Array(W);
   for (let x = 0; x < W; x++) {
     let s = 0;
-    for (let y = y0; y <= y1; y++) s += bin[y * W + x];
-    dens[x] = s / h;
+    for (let y = top; y <= bot; y++) s += bin[y * W + x];
+    dens[x] = s / need;
   }
   // 오선 높이를 꽉 채우면서 양옆이 (오선줄 말고는) 비어 있는 열만 마디선으로 본다.
   // 12/8 같은 박자표·음표 기둥은 옆이 두꺼워서 걸러진다.
+  const h = sysv[0][4] - sysv[0][0];
   const gap = Math.max(3, Math.round(h / 9));
   for (let x = 0; x < W; x++) {
     if (dens[x] < .95) { out[x] = 0; continue; }
@@ -199,9 +206,9 @@ function colSets({ bin, W }, staff) {
   return out;
 }
 
-function barsOf(cols, W) {
+function barsOf(colBits, W) {
   const common = [];
-  for (let x = 0; x < W; x++) { if (cols.every(c => c[x])) common.push(x); }
+  for (let x = 0; x < W; x++) { if (colBits[x]) common.push(x); }
   if (common.length < 2) return [];
   const tol = Math.max(4, Math.floor(W / 90)), bars = [];
   let c = [common[0]];
@@ -295,7 +302,7 @@ function analyzeLayout(pages, expect, forceK) {
     const pd = pageData(cv);
     const staves = staffLines(pd);
     if (!staves) throw new Error('오선을 찾지 못했습니다. 악보 PDF가 맞는지 확인해주세요.');
-    return { pd, staves, cols: staves.map(s => colSets(pd, s)) };
+    return { pd, staves };
   });
 
   const build = k => {
@@ -303,7 +310,7 @@ function analyzeLayout(pages, expect, forceK) {
     for (const p of data) {
       const ps = [];
       for (const sysv of groupSystems(p.pd, p.staves, k)) {
-        const bars = barsOf(sysv.map(s => p.cols[p.staves.indexOf(s)]), p.pd.W);
+        const bars = barsOf(barlineCols(p.pd, sysv), p.pd.W);
         if (bars.length < 2) return null;
         total += bars.length - 1;
         ps.push({ staves: sysv.map(s => [s[0], s[4]]), bars });
