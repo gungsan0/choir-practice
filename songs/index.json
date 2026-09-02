@@ -41,6 +41,19 @@
       "pages": 6,
       "duration": 273.35,
       "measures": 78
+    },
+    {
+      "id": "heungbu-nolbu",
+      "title": "흥부와 놀부",
+      "subtitle": "울림 어린이 합창단",
+      "parts": [
+        "Part1",
+        "Part2"
+      ],
+      "accomp": "반주",
+      "pages": 5,
+      "duration": 331.08,
+      "measures": 127
     }
   ]
 }
