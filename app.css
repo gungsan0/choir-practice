@@ -12,7 +12,8 @@ button{font-family:inherit}
 
 /* ── 랜딩 ───────────────────────────────────── */
 .top{background:var(--panel);color:#fff;padding:26px 18px 22px}
-.top .inner{max-width:820px;margin:0 auto}
+.top .inner{max-width:820px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.langbtn{flex:0 0 auto;white-space:nowrap;font-weight:600}
 .brand{display:flex;align-items:center;gap:11px}
 .brand svg{flex:0 0 auto}
 .brand h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.2px}

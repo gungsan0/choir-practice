@@ -1,6 +1,6 @@
 /* 울림 합창 연습실 — 오프라인 지원 */
-const SHELL = 'shell-2026.10.07-a';
-const FILES = ['./', 'index.html', 'player.html', 'player.js', 'app.css',
+const SHELL = 'shell-2026.10.08-a';
+const FILES = ['./', 'index.html', 'player.html', 'player.js', 'i18n.js', 'app.css',
   'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable.png', 'logo-badge.png',
   'add.html', 'add.js', 'vendor/fflate.min.js', 'vendor/pdf.min.mjs', 'vendor/pdf.worker.min.mjs'];
 

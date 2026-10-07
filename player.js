@@ -3,6 +3,7 @@
    · 두 파트 이상 겹칠 때: Web Audio 로 완전히 같은 시각에 재생 (밀림 없음)      */
 (function () {
   const $ = id => document.getElementById(id);
+  const tr = I18N.t;                               // 한/영 문구 (T 는 재생 시각 함수라 이름을 달리함)
   const songId = new URLSearchParams(location.search).get('song');
   const main = $('main'), hdr = document.querySelector('header'), spacer = $('spacer');
   if (!songId) { location.replace('index.html'); return; }
@@ -12,6 +13,8 @@
   let loopA = null, loopB = null, multi = false, loopMode = false;
   let accId = null, accOn = false, accVol = 0.6;   // 반주
   let syncOff = 0;                                 // 악보 싱크 미세조정(초)
+  let loadErr = null, dlState = null, statusKey = '';              // 언어를 바꿔도 같은 문구를 다시 그리려고 상태를 기억
+  const pageImgs = [], hitEls = [];
   const ovs = [], sys = div('sys'), lmk = div('loopmark'), hls = {};
 
   function div(c) { const d = document.createElement('div'); d.className = c; return d; }
@@ -51,7 +54,7 @@
       if (this.ctx.state === 'suspended') await this.ctx.resume();
       const need = ids.filter(id => !this.buf[id]);
       if (need.length) {
-        setStatus('음원 준비 중…');
+        setStatus('status.loading');
         await Promise.all(need.map(async id => {
           const r = await getAsset(base + id + '.mp3');
           const ab = await r.arrayBuffer();
@@ -167,29 +170,25 @@
       return song;
     })
     .then(init)
-    .catch(() => {
-      let local = false;
-      try { local = JSON.parse(localStorage.getItem('localSongs') || '[]').some(s => s.id === songId); } catch (e) { }
-      main.innerHTML = '<div class="hint" style="display:block">곡을 불러오지 못했습니다.<br>' +
-        (local
-          ? '이 기기에 추가한 곡인데 저장된 파일을 찾을 수 없습니다. 곡 목록에서 <b>다시 만들기</b>로 파일을 다시 올려주세요.'
-          : `서버에 <code>songs/${songId}/song.json</code> 이 없습니다. 곡 폴더가 지워졌을 수 있어요 — ` +
-            '<b>＋ 곡 추가 → GitHub 연결 설정 → 저장소에서 곡 목록 복구</b>를 눌러 목록을 맞춰보세요.') +
-        '<br><a href="index.html" style="text-decoration:underline">← 곡 목록</a></div>';
-    });
+    .catch(() => { loadErr = isLocal() ? 'local' : 'remote'; paintLoadError(); });
+
+  function paintLoadError() {
+    if (!loadErr) return;
+    main.innerHTML = '<div class="hint" style="display:block">' + tr('err.title') + '<br>' +
+      (loadErr === 'local' ? tr('err.local') : tr('err.remote', { id: I18N.esc(songId) })) +
+      '<br><a href="index.html" style="text-decoration:underline">' + tr('back.link') + '</a></div>';
+  }
 
   function init(song) {
     D = song; parts = song.parts; sel = [parts[0].id];
-    document.title = song.title + ' — 울림 합창 연습실';
     $('ttl').textContent = song.title;
-    $('foot').textContent = (song.subtitle ? song.subtitle + ' · ' : '') + '파트별 강조 음원 ' + parts.length + '종';
 
     $('parts').innerHTML = parts.map((p, i) =>
-      `<button class="part${i === 0 ? ' on' : ''}" data-p="${p.id}"${i === 0 ? ` style="background:${p.color}"` : ''}>${p.name}</button>`).join('');
+      `<button class="part${i === 0 ? ' on' : ''}" data-p="${I18N.esc(p.id)}"${i === 0 ? ` style="background:${I18N.esc(p.color)}"` : ''}>${I18N.esc(p.name)}</button>`).join('');
 
     for (let i = 0; i < song.pages; i++) {
       const d = div('page'), img = new Image();
-      img.alt = '악보 ' + (i + 1) + '쪽';
+      pageImgs.push(img);
       img.loading = i < 2 ? 'eager' : 'lazy';
       assetURL(base + 'p' + (i + 1) + '.webp').then(u => { img.src = u; });
       const ov = div('ov'); d.append(img, ov); main.appendChild(d); ovs.push(ov);
@@ -197,7 +196,7 @@
     D.measures.forEach(m => {
       const h = div('hit');
       h.style.cssText = `left:${m.x}%;width:${m.w}%;top:${m.sy[0]}%;height:${m.sy[1]}%`;
-      h.title = '마디 ' + m.m;
+      hitEls.push([h, m.m]);
       h.onclick = e => (loopMode || e.shiftKey) ? setLoop(m.m) : seekM(m.m);
       ovs[m.pg].appendChild(h);
     });
@@ -214,13 +213,38 @@
       if (!fromCache) parts.slice(1).forEach(p => realURL(base + p.id + '.mp3').then(u => fetch(u)).catch(() => { }));
     }, 2000));
 
+    labelSong();
     wire(); fit(); render(true);
-    if (isLocal()) { $('dl').textContent = '✓ 이 기기에 저장됨'; $('dl').classList.add('act'); }
+    if ('ResizeObserver' in window) new ResizeObserver(fit).observe(hdr);
+    dlState = isLocal() ? 'local' : null; paintDl();
     (function loop() { render(false); requestAnimationFrame(loop); })();
   }
 
+  /* 곡 제목 밑 글자·악보 대체글·마디 툴팁 — 언어를 바꾸면 다시 단다 */
+  function labelSong() {
+    document.title = D.title + ' — ' + tr('app.name');
+    $('foot').textContent = (D.subtitle ? I18N.data(D.subtitle) + ' · ' : '') + tr('foot', { n: parts.length });
+    pageImgs.forEach((img, i) => { img.alt = tr('score.alt', { n: i + 1 }); });
+    hitEls.forEach(([h, m]) => { h.title = tr('bar.n', { n: m }); });
+  }
+  function paintDl() {
+    const key = { local: 'dl.local', unsupported: 'dl.unsupported', saving: 'dl.saving', done: 'dl.done', fail: 'dl.fail' }[dlState] || 'dl.save';
+    $('dl').textContent = tr(key);
+    $('dl').classList.toggle('act', dlState === 'local' || dlState === 'done');
+  }
+  const showSync = () => {
+    $('sync').textContent = tr('sync.label', { v: (syncOff >= 0 ? '+' : '') + syncOff.toFixed(1) });
+    $('sync').classList.toggle('act', syncOff !== 0);
+  };
+  I18N.onChange(() => {                          // I18N.apply() 가 정적 문구를 바꾼 뒤, 상태에 따라 달라지는 글자를 다시 단다
+    if (!D) { paintLoadError(); return; }
+    labelSong(); paintLoop(); paintParts(); showSync(); paintDl(); paintStatus();
+    fit();                                       // 영어 글자가 더 길어 헤더가 두 줄이 되면 높이를 다시 맞춘다
+  });
+
   const fit = () => { spacer.style.height = hdr.offsetHeight + 'px'; };
-  const setStatus = s => { $('st').textContent = s; };
+  const paintStatus = () => { $('st').textContent = statusKey ? tr(statusKey) : ''; };
+  const setStatus = key => { statusKey = key; paintStatus(); };
 
   function mAt(t) {
     if (t < D.times[0]) return 1;
@@ -243,16 +267,16 @@
     const btn = $('loop');
     btn.classList.toggle('act', loopMode || loopA !== null);
     if (loopB !== null) {
-      btn.textContent = `🔁 ${loopA}~${loopB} 마디 ✕`;
+      btn.textContent = tr('loop.set', { a: loopA, b: loopB });
       $('lp').textContent = '';
     } else if (loopA !== null) {
-      btn.textContent = '🔁 끝 마디 선택';
-      $('lp').textContent = `시작 ${loopA}마디 — 끝 마디를 누르세요`;
+      btn.textContent = tr('loop.pickEnd');
+      $('lp').textContent = tr('loop.hintEnd', { a: loopA });
     } else if (loopMode) {
-      btn.textContent = '🔁 시작 마디 선택';
-      $('lp').textContent = '반복할 시작 마디를 누르세요';
+      btn.textContent = tr('loop.pickStart');
+      $('lp').textContent = tr('loop.hintStart');
     } else {
-      btn.textContent = '🔁 구간 반복';
+      btn.textContent = tr('loop');
       $('lp').textContent = '';
     }
     lmk.remove();
@@ -271,11 +295,11 @@
       x.style.background = on ? partOf(x.dataset.p).color : '';
     });
     $('mix').classList.toggle('act', multi);
-    $('mix').textContent = multi ? '겹쳐 듣기 ON' : '겹쳐 듣기';
+    $('mix').textContent = multi ? tr('mix.on') : tr('mix');
     document.querySelectorAll('[data-sp]').forEach(b => {
       const off = needsWA() && b.dataset.sp !== '1';
       b.disabled = off; b.style.opacity = off ? .35 : 1;
-      b.title = off ? '반주를 깔거나 여러 파트를 겹쳐 들을 때는 1배속만 지원합니다' : '';
+      b.title = off ? tr('speed.limit') : '';
     });
     if (needsWA() && rate !== 1) setRate(1);
     $('acc').classList.toggle('act', accOn);
@@ -332,7 +356,6 @@
       accVol = +$('accvol').value / 100;
       if (WA.gacc) WA.gacc.gain.value = accVol;
     };
-    const showSync = () => { $('sync').textContent = '싱크 ' + (syncOff >= 0 ? '+' : '') + syncOff.toFixed(1) + '초'; $('sync').classList.toggle('act', syncOff !== 0); };
     const bump = v => { syncOff = Math.round((syncOff + v) * 10) / 10; localStorage.setItem('sync-' + songId, syncOff); showSync(); render(true); };
     $('syncm').onclick = () => bump(-0.2);
     $('syncp').onclick = () => bump(0.2);
@@ -341,8 +364,8 @@
     showSync();
     $('dl').onclick = saveOffline;
     $('rf').onclick = async () => {
-      if (isLocal()) { alert('이 곡은 이 기기에서 추가한 곡이라 다시 받을 원본이 없습니다.\n곡 목록에서 “다시 만들기”를 눌러주세요.'); return; }
-      if (!confirm('이 곡의 악보·음원을 최신으로 다시 받을까요?')) return;
+      if (isLocal()) { alert(tr('rf.local')); return; }
+      if (!confirm(tr('rf.confirm'))) return;
       try { await caches.delete('songs-' + songId); } catch (e) { }
       location.reload();
     };
@@ -362,19 +385,20 @@
   }
   async function saveOffline() {
     const btn = $('dl');
-    if (!('caches' in window)) { btn.textContent = '이 브라우저는 미지원'; return; }
-    if (isLocal()) { btn.textContent = '✓ 이 기기에 저장됨'; btn.classList.add('act'); return; }
-    btn.disabled = true; btn.textContent = '저장 중…';
+    if (!('caches' in window)) { dlState = 'unsupported'; paintDl(); return; }
+    if (isLocal()) { dlState = 'local'; paintDl(); return; }
+    btn.disabled = true; dlState = 'saving'; paintDl();
     try {
       const urls = await Promise.all(
-        [base + 'song.json', 'player.html', 'player.js', 'app.css', 'index.html']
+        [base + 'song.json', 'player.html', 'player.js', 'i18n.js', 'app.css', 'index.html']
           .concat(Array.from({ length: D.pages }, (_, i) => base + 'p' + (i + 1) + '.webp'))
           .concat(parts.map(p => base + p.id + '.mp3'))
           .concat(accId ? [base + accId + '.mp3'] : [])
           .map(u => realURL(u)));
       await (await caches.open('songs-' + songId)).addAll(urls);
-      btn.textContent = '✓ 저장됨'; btn.classList.add('act');
-    } catch (e) { btn.textContent = '저장 실패'; }
+      dlState = 'done';
+    } catch (e) { dlState = 'fail'; }
+    paintDl();
     btn.disabled = false;
   }
 
@@ -385,7 +409,7 @@
     const m = mAt(t), o = D.measures[m - 1];
     $('bar').value = Math.min(1000, T() / dur() * 1000);
     $('tm').textContent = fmt(T()) + ' / ' + fmt(dur());
-    $('mn').textContent = '마디 ' + m;
+    $('mn').textContent = tr('bar.n', { n: m });
     if (m !== cur || force) {
       cur = m;
       ovs[o.pg].append(sys);

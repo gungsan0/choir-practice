@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>울림 합창 연습실</title>
+<title data-i18n="app.name">울림 합창 연습실</title>
 <meta name="theme-color" content="#15181d">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -13,45 +13,47 @@
 <body>
 <header>
   <div class="row">
-    <a class="back" href="index.html" title="곡 목록" aria-label="곡 목록">&#8592;</a>
-    <a href="index.html" class="logo" aria-label="울림 합창 연습실"><img src="logo-badge.png" width="30" height="30" alt=""></a>
+    <a class="back" href="index.html" title="곡 목록" aria-label="곡 목록" data-i18n-title="back" data-i18n-aria="back">&#8592;</a>
+    <a href="index.html" class="logo" aria-label="울림 합창 연습실" data-i18n-aria="app.name"><img src="logo-badge.png" width="30" height="30" alt=""></a>
     <h1 class="title" id="ttl">&nbsp;</h1>
     <div class="parts" id="parts"></div>
-    <button class="btn" id="mix" title="두 파트 이상 겹쳐서 함께 듣기">겹쳐 듣기</button>
-    <button class="btn" id="acc" hidden title="반주를 함께 깔기">🎹 반주</button>
-    <input id="accvol" class="vol" type="range" min="0" max="100" value="60" hidden aria-label="반주 음량">
+    <button class="btn" id="mix" title="두 파트 이상 겹쳐서 함께 듣기" data-i18n="mix" data-i18n-title="mix.tip">겹쳐 듣기</button>
+    <button class="btn" id="acc" hidden title="반주를 함께 깔기" data-i18n="acc" data-i18n-title="acc.tip">🎹 반주</button>
+    <input id="accvol" class="vol" type="range" min="0" max="100" value="60" hidden aria-label="반주 음량" data-i18n-aria="acc.vol">
     <span class="mono" id="st"></span>
     <span class="tag" id="lp"></span>
+    <button class="btn langbtn" type="button" data-lang-toggle style="margin-left:auto">EN</button>
   </div>
   <div class="row">
-    <button id="play" aria-label="재생">&#9654;</button>
+    <button id="play" aria-label="재생" data-i18n-aria="play">&#9654;</button>
     <span class="mono" id="tm">0:00 / 0:00</span>
-    <input id="bar" type="range" min="0" max="1000" value="0" aria-label="재생 위치">
-    <span class="mono" id="mn">마디 1</span>
+    <input id="bar" type="range" min="0" max="1000" value="0" aria-label="재생 위치" data-i18n-aria="pos">
+    <span class="mono" id="mn" data-i18n="bar.n" data-i18n-args='{"n":1}'>마디 1</span>
     <button class="btn" data-sp="0.6">0.6&times;</button>
     <button class="btn" data-sp="0.75">0.75&times;</button>
     <button class="btn" data-sp="0.9">0.9&times;</button>
     <button class="btn act" data-sp="1">1&times;</button>
-    <button class="btn" id="loop">🔁 구간 반복</button>
-    <span class="mono" style="margin-left:2px">확대</span>
+    <button class="btn" id="loop" data-i18n="loop">🔁 구간 반복</button>
+    <span class="mono" style="margin-left:2px" data-i18n="zoom">확대</span>
     <button class="btn zm act" data-z="1">1&times;</button>
     <button class="btn zm" data-z="1.6">1.6&times;</button>
     <button class="btn zm" data-z="2.4">2.4&times;</button>
-    <button class="btn" id="syncm" title="악보를 0.2초 빠르게">◀</button>
-    <button class="btn" id="sync" title="누르면 0으로 되돌립니다">싱크 +0.0초</button>
-    <button class="btn" id="syncp" title="악보를 0.2초 늦게">▶</button>
-    <button class="btn" id="dl">오프라인 저장</button>
-    <button class="btn" id="rf" title="이 곡의 악보·음원을 최신으로 다시 받기">↻</button>
+    <button class="btn" id="syncm" title="악보를 0.2초 빠르게" data-i18n-title="sync.earlier">◀</button>
+    <button class="btn" id="sync" title="누르면 0으로 되돌립니다" data-i18n-title="sync.reset" data-i18n="sync.label" data-i18n-args='{"v":"+0.0"}'>싱크 +0.0초</button>
+    <button class="btn" id="syncp" title="악보를 0.2초 늦게" data-i18n-title="sync.later">▶</button>
+    <button class="btn" id="dl" data-i18n="dl.save">오프라인 저장</button>
+    <button class="btn" id="rf" title="이 곡의 악보·음원을 최신으로 다시 받기" data-i18n-title="rf.tip">↻</button>
   </div>
 </header>
 <div id="spacer"></div>
-<div class="hint">
+<div class="hint" data-i18n-html="hint">
   마디를 <b>클릭</b>하면 그 지점부터 재생 · <b>Shift+클릭</b> 두 번으로 구간 반복(A→B) 설정 ·
   <kbd>Space</kbd> 재생/정지 · <kbd>&larr;</kbd><kbd>&rarr;</kbd> 한 마디 이동 ·
   <b>🔁 구간 반복</b>을 누른 뒤 시작·끝 마디를 차례로 누르면 그 구간만 반복됩니다 · <b>🎹 반주</b>를 켜면 반주가 함께 깔립니다(옆 슬라이더로 음량 조절) · <b>겹쳐 듣기</b>를 켜면 두 파트 이상을 동시에 들을 수 있어요
 </div>
 <main id="main"></main>
 <footer id="foot"></footer>
+<script src="i18n.js"></script>
 <script src="player.js"></script>
 </body>
 </html>

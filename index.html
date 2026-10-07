@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>울림 합창 연습실</title>
-<meta name="description" content="악보를 따라가며 파트별로 연습하는 합창 연습 앱">
+<title data-i18n="app.name">울림 합창 연습실</title>
+<meta name="description" data-i18n-content="app.desc" content="악보를 따라가며 파트별로 연습하는 합창 연습 앱">
 <meta name="theme-color" content="#15181d">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -13,22 +13,26 @@
 </head>
 <body>
 <div class="top"><div class="inner"><div class="brand">
-  <img src="logo-badge.png" width="46" height="46" alt="울림 어린이합창단">
-  <div><h1>울림 합창 연습실</h1><p>악보를 따라가며 파트별로 연습하세요</p></div>
-</div></div></div>
+  <img src="logo-badge.png" width="46" height="46" alt="울림 어린이합창단" data-i18n-alt="logo.alt">
+  <div><h1 data-i18n="app.name">울림 합창 연습실</h1><p data-i18n="app.tagline">악보를 따라가며 파트별로 연습하세요</p></div>
+</div><button class="btn langbtn" type="button" data-lang-toggle>EN</button></div></div>
 
 <div class="wrap">
   <div class="toolbar">
-    <input class="search" id="q" type="search" placeholder="곡 검색" autocomplete="off">
-    <a class="add" href="add.html" id="addbtn" hidden>＋ 곡 추가</a>
+    <input class="search" id="q" type="search" placeholder="곡 검색" data-i18n-ph="q.ph" autocomplete="off">
+    <a class="add" href="add.html" id="addbtn" data-i18n="add.btn" hidden>＋ 곡 추가</a>
   </div>
   <div class="list" id="list"></div>
   <div class="note" id="note"></div>
 </div>
 
+<script src="i18n.js"></script>
 <script>
+const T=I18N.t, E=I18N.esc;
+const busy=new Map();                          // 삭제 진행 중인 곡(id → [문구 키, 값]) — 언어를 바꿔 목록을 다시 그려도 유지
+const busyText=id=>{ const b=busy.get(id); return b?T(b[0],b[1]):T('del.btn'); };
 const COLORS=["#e0483c","#1f9d55","#2f6fe0","#8b5cf6","#e08a1e","#0d9488","#d6336c","#4b5563"];
-const fmt=s=>Math.floor(s/60)+'분 '+String(Math.round(s%60)).padStart(2,'0')+'초';
+const fmt=s=>{ let m=Math.floor(s/60), r=Math.round(s%60); if(r===60){ m++; r=0; } return T('fmt.dur',{m,s:String(r).padStart(2,'0')}); };
 let songs=[], cached=new Set();
 
 /* 곡 추가·공개·삭제는 저장소 관리자만 — 실제 권한은 GitHub 토큰이 쥐고 있고(토큰 없이는
@@ -58,32 +62,46 @@ function render(){
   const rows=songs.filter(s=>!q||(s.title+' '+(s.subtitle||'')+' '+(s.parts||[]).join(' ')).toLowerCase().includes(q));
   list.innerHTML='';
   if(!rows.length){
-    list.innerHTML='<div class="empty">'+(songs.length
-      ? '검색 결과가 없습니다.'
-      : (owner
-        ? '아직 등록된 곡이 없습니다.<br><b>＋ 곡 추가</b> 를 눌러 악보 PDF와 파트별 음원을 올려보세요.'
-        : '아직 등록된 곡이 없습니다.'))+'</div>';
+    list.innerHTML='<div class="empty">'+(songs.length ? T('empty.search') : (owner ? T('empty.owner') : T('empty.none')))+'</div>';
     return;
   }
   rows.forEach(s=>{
     const a=document.createElement('a');
     a.className='card'; a.href='player.html?song='+encodeURIComponent(s.id);
-    const chips=(s.parts||[]).map((p,i)=>`<span class="chip" style="background:${COLORS[i%COLORS.length]}">${p}</span>`).join('')
-      +(s.accomp?`<span class="chip" style="background:#6b7280">🎹 ${s.accomp}</span>`:'');
-    a.innerHTML=`<h2>${s.title}</h2>`+(s.subtitle?`<p class="sub">${s.subtitle}</p>`:'')+
+    const chips=(s.parts||[]).map((p,i)=>`<span class="chip" style="background:${COLORS[i%COLORS.length]}">${E(p)}</span>`).join('')
+      +(s.accomp?`<span class="chip" style="background:#6b7280">🎹 ${E(I18N.data(s.accomp))}</span>`:'');
+    a.innerHTML=`<h2>${E(s.title)}</h2>`+(s.subtitle?`<p class="sub">${E(I18N.data(s.subtitle))}</p>`:'')+
       `<div class="chips">${chips}
         ${s.local
-          ? '<span class="scope only" title="아직 공개하지 않아 이 기기에서만 보입니다. 다른 사람에게도 보이게 하려면 다시 만들기 → 모두에게 공개를 눌러주세요.">📱 이 기기에만 있음</span>'
-          : '<span class="scope pub" title="저장소에 올라가 있어 모든 사람에게 보입니다.">🌐 모두에게 공개</span>'}
-        ${!s.local&&cached.has(s.id)?'<span class="saved">● 오프라인 저장됨</span>':''}
-        <span class="meta">${s.measures?s.measures+'마디 · ':''}${s.pages?s.pages+'쪽 · ':''}${s.duration?fmt(s.duration):''}</span>
-        ${owner?`<button class="del" data-fix="${s.id}" title="악보 인식을 다시 해서 이 곡을 덮어씁니다">다시 만들기</button>`:''}
-        ${owner||s.local?`<button class="del danger" data-del="${s.id}" title="${s.local?'이 기기에서 삭제':'모두에게서 삭제 (GitHub)'}">삭제</button>`:''}
+          ? `<span class="scope only" title="${T('scope.only.tip')}">${T('scope.only')}</span>`
+          : `<span class="scope pub" title="${T('scope.pub.tip')}">${T('scope.pub')}</span>`}
+        ${!s.local&&cached.has(s.id)?`<span class="saved">${T('saved.offline')}</span>`:''}
+        <span class="meta">${s.measures?T('bars',{n:s.measures})+' · ':''}${s.pages?T('pages',{n:s.pages})+' · ':''}${s.duration?fmt(s.duration):''}</span>
+        ${owner?`<button class="del" data-fix="${E(s.id)}" title="${T('fix.tip')}">${T('fix.btn')}</button>`:''}
+        ${owner||s.local?`<button class="del danger" data-del="${E(s.id)}"${busy.has(s.id)?' disabled':''} title="${s.local?T('del.tip.local'):T('del.tip.pub')}">${E(busyText(s.id))}</button>`:''}
       </div>`;
     list.appendChild(a);
   });
 }
 
+let ready=false;
+function paintNote(){
+  document.getElementById('note').innerHTML =
+    (owner ? T('note.owner') : T('note.guest')) + T('note.common') +
+    ' <span style="opacity:.7">'+T('note.version',{v:'2026.10.08-a'})+'</span> · <a href="#" id="hard" style="text-decoration:underline">'+T('note.reload')+'</a>' +
+    (owner ? '' : ' · <a href="add.html" style="opacity:.55">'+T('note.admin')+'</a>');
+  document.getElementById('hard').onclick = async e => {
+    e.preventDefault();
+    try {
+      const rs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(rs.map(r => r.unregister()));
+      const keys = await caches.keys();
+      await Promise.all(keys.filter(k => k.startsWith('shell-')).map(k => caches.delete(k)));
+    } catch (err) {}
+    location.reload(true);
+  };
+}
+I18N.onChange(()=>{ if(ready){ render(); paintNote(); } });
 (async ()=>{
   try{
     const r=await fetch('songs/index.json',{cache:'no-cache'});
@@ -97,26 +115,8 @@ function render(){
   }catch(e){}
   cached=await cachedIds();
   render();
-  document.getElementById('note').innerHTML =
-    (owner
-      ? '<b>＋ 곡 추가</b>에서 악보 PDF와 파트별 음원을 올리면 앱이 마디를 찾아 자동으로 맞춰줍니다. ' +
-        '<b class="scope pub">🌐 모두에게 공개</b> 는 저장소에 올라가 모든 사람이 볼 수 있는 곡, ' +
-        '<b class="scope only">📱 이 기기에만 있음</b> 은 아직 공개하지 않아 이 기기에서만 보이는 곡입니다. '
-      : '곡 추가·수정·삭제는 이 앱을 관리하는 사람만 할 수 있습니다. ') +
-    '곡 하나를 열어 <b>오프라인 저장</b>을 누르면 인터넷 없이도 연습할 수 있어요. ' +
-    '휴대폰에서는 공유 → 홈 화면에 추가하면 앱처럼 열립니다.' +
-    ' <span style="opacity:.7">앱 버전 2026.08.15-c</span> · <a href="#" id="hard" style="text-decoration:underline">앱 새로고침</a>' +
-    (owner ? '' : ' · <a href="add.html" style="opacity:.55">관리자</a>');
-  document.getElementById('hard').onclick = async e => {
-    e.preventDefault();
-    try {
-      const rs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(rs.map(r => r.unregister()));
-      const keys = await caches.keys();
-      await Promise.all(keys.filter(k => k.startsWith('shell-')).map(k => caches.delete(k)));
-    } catch (err) {}
-    location.reload(true);
-  };
+  ready=true;
+  paintNote();
 })();
 document.getElementById('q').addEventListener('input',render);
 /* ── 곡 삭제 / 다시 만들기 ─────────────────────────── */
@@ -137,7 +137,7 @@ async function removeLocal(id){
 async function removePublished(id, say){
   const c=ghCfg();
   if(!c.repo||!c.token){
-    alert('공개된 곡을 지우려면 GitHub 연결이 필요합니다.\n＋ 곡 추가 → GitHub 연결 설정에서 저장소와 토큰을 먼저 입력해주세요.');
+    alert(T('del.needgh'));
     location.href='add.html'; return false;
   }
   const branch=c.branch||'main';
@@ -145,12 +145,12 @@ async function removePublished(id, say){
   if(Array.isArray(files)){
     let i=0;
     for(const f of files){
-      say(`삭제 중… (${++i}/${files.length}) ${f.name}`);
+      say('del.progress',{i:++i,n:files.length,name:f.name});
       await ghApi('/contents/'+f.path, {method:'DELETE',
         body:JSON.stringify({message:'remove '+f.path, sha:f.sha, branch})});
     }
   }
-  say('곡 목록 갱신 중…');
+  say('del.updating');
   const cur=await ghApi('/contents/songs/index.json?ref='+branch);
   if(cur&&cur.content){
     let idx={songs:[]};
@@ -176,19 +176,18 @@ document.getElementById('list').addEventListener('click', async e=>{
   }
 
   const id=del.dataset.del, s=songs.find(x=>x.id===id)||{};
-  const say=t=>{ del.textContent=t; };
+  if(busy.has(id)) return;                     // 이미 삭제 중
+  const say=(key,vars)=>{ busy.set(id,[key,vars]); const b=[...document.querySelectorAll('[data-del]')].find(x=>x.dataset.del===id); if(b) b.textContent=busyText(id); };
   if(!s.local&&!owner) return;                 // 공개된 곡은 관리자만
-  if(s.local){
-    if(!confirm(`"${s.title}" 을(를) 이 기기에서 삭제할까요?`)) return;
-    await removeLocal(id);
-  }else{
-    if(!confirm(`"${s.title}" 을(를) GitHub에서 완전히 삭제할까요?\n모든 사람의 목록에서 사라집니다. (1~2분 뒤 반영)`)) return;
-    del.disabled=true;
-    try{ if(!await removePublished(id, say)) return; }
-    catch(err){ alert('삭제 실패: '+err.message); del.disabled=false; del.textContent='삭제'; return; }
-  }
-  songs=songs.filter(x=>x.id!==id);
-  cached.delete(id);
+  if(!confirm(s.local?T('del.confirm.local',{title:s.title}):T('del.confirm.pub',{title:s.title}))) return;
+  del.disabled=true; busy.set(id,['del.btn']);   // 로컬·공개 모두 끝날 때까지 잠근다(언어를 바꿔 다시 그려도 유지)
+  let ok=false;
+  try{
+    if(s.local){ await removeLocal(id); ok=true; }
+    else ok=!!(await removePublished(id, say));
+  }catch(err){ alert(T('del.fail',{msg:err.message})); }
+  finally{ busy.delete(id); }
+  if(ok){ songs=songs.filter(x=>x.id!==id); cached.delete(id); }
   render();
 });
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
