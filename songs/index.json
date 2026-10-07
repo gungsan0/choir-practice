@@ -1,6 +1,21 @@
 {
   "songs": [
     {
+      "id": "song-of-the-wind-show",
+      "title": "바람의 노래 Song of the Wind",
+      "subtitle": "",
+      "parts": [
+        "Soprano",
+        "Alto",
+        "Tenor",
+        "Bass"
+      ],
+      "accomp": null,
+      "pages": 6,
+      "duration": 273.35,
+      "measures": 78
+    },
+    {
       "id": "amazing-arirang5",
       "title": "Amazing Arirang",
       "subtitle": "울림 어린이 합창단",
@@ -26,21 +41,6 @@
       "pages": 6,
       "duration": 262.5,
       "measures": 83
-    },
-    {
-      "id": "song-of-the-wind-show",
-      "title": "바람의 노래 Song of the Wind",
-      "subtitle": "",
-      "parts": [
-        "Soprano",
-        "Alto",
-        "Tenor",
-        "Bass"
-      ],
-      "accomp": null,
-      "pages": 6,
-      "duration": 273.35,
-      "measures": 78
     }
   ]
 }
