@@ -144,8 +144,28 @@
     return r ? URL.createObjectURL(await r.blob()) : url;
   }
 
+  /* 곡 파일(악보·음원)은 캐시 우선이라, 같은 이름으로 덮어쓴 곡(다시 만들기)은 옛 파일이 계속 보인다.
+     song.json 의 rev 가 이 기기에서 마지막으로 본 값과 다르면 그 곡의 저장분을 비우고 새로 받는다.
+     (이 기기에서 추가한 곡은 원본이 없으니 건드리지 않는다) */
+  async function dropStaleFiles(song, res) {
+    if (!song.rev || fromCache || isLocal()) return;
+    let seen = null;
+    try { seen = localStorage.getItem('rev-' + songId); } catch (e) { }
+    if (seen === song.rev) return;
+    try {
+      await caches.delete('songs-' + songId);
+      await (await caches.open('songs-' + songId)).put(abs(base + 'song.json'), res);
+      localStorage.setItem('rev-' + songId, song.rev);
+    } catch (e) { }
+  }
+
   getAsset(base + 'song.json')
-    .then(r => { if (!r) throw 0; return r.json(); })
+    .then(async r => {
+      if (!r) throw 0;
+      const copy = r.clone(), song = await r.json();
+      await dropStaleFiles(song, copy);
+      return song;
+    })
     .then(init)
     .catch(() => {
       let local = false;

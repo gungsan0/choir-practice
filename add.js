@@ -551,7 +551,8 @@ async function run(fresh) {
       subtitle: $('subtitle').value.trim(),
       parts: order.map((p, i) => ({ id: p, name: p, color: PALETTE[i % PALETTE.length] })),
       accomp: accId || null,
-      pages: PAGES.length, duration: +duration.toFixed(2), measures: meas, times
+      pages: PAGES.length, duration: +duration.toFixed(2), measures: meas, times,
+      rev: Date.now().toString(36)                  // 덮어쓸 때마다 바뀜 — 받아둔 옛 악보·음원을 기기에서 비우는 신호
     };
 
     $('sps').value = LAY.k; $('bpm').value = bpm; $('off').value = +off.toFixed(2);
