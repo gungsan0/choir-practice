@@ -108,23 +108,31 @@ async function readScore(file) {
     if (t && !(i + 1 in tempo)) tempo[i + 1] = Math.round(+t.textContent * 60 * 1e4) / 1e4;
   }));
 
-  const onsets = new Set();
+  const onsets = new Set(), fer = {};
   staves.forEach(st => [...st.querySelectorAll(':scope > Measure')].forEach((m, i) => {
     const start = beats.slice(0, i).reduce((a, b) => a + b, 0);
     m.querySelectorAll(':scope > voice').forEach(v => {
-      let pos = 0;
+      let pos = 0, pend = false;                   // 늘임표는 붙은 음표 바로 앞 형제 요소로 저장된다(MuseScore 3은 음표 안)
       [...v.children].forEach(e => {
+        if (e.tagName === 'Fermata') { pend = true; return; }
         if (e.tagName !== 'Chord' && e.tagName !== 'Rest') return;
         const dt = (e.querySelector(':scope > durationType') || {}).textContent;
         let d = DUR[dt] || 0;
         const dots = e.querySelector(':scope > dots');
         if (dots) d *= 2 - Math.pow(.5, +dots.textContent);
+        if (dt === 'measure') d = beats[i];        // 온마디쉼표
+        if (pend || e.querySelector(':scope > Fermata')) {   // 한 마디에 여러 개면(파트마다) 가장 긴 음표 기준
+          const f = fer[i + 1];
+          if (!f || d > f.dur) fer[i + 1] = { m: i + 1, pos: +pos.toFixed(4), dur: +d.toFixed(4) };
+        }
+        pend = false;
         if (e.tagName === 'Chord') onsets.add(+(start + pos).toFixed(4));
         pos += d;
       });
     });
   }));
-  return { parts, measures: measures0.length, beats, tempo, onsets: [...onsets].sort((a, b) => a - b) };
+  const fermatas = Object.values(fer).sort((a, b) => a.m - b.m);
+  return { parts, measures: measures0.length, beats, tempo, onsets: [...onsets].sort((a, b) => a - b), fermatas };
 }
 
 /* ───────────────────────── 악보 → 이미지 → 마디 찾기 */
@@ -458,44 +466,117 @@ function onsetTimes(buf) {
   return times;
 }
 
-function measureStarts(beats, tempoMap, firstBpm, offset) {
+/* 늘임표 — 음원(MuseScore 재생음)은 늘임표가 붙은 음표를 길게 늘여 연주한다.
+   마디 시각을 일정한 템포로만 계산하면 하이라이트가 그만큼씩 앞서 가므로, 늘임표가 있는 마디는
+   그 늘어난 시간(extra, 초)만큼 길게 잡는다.
+   · 기본 추정: 음표가 2배로 연주된다고 보고 "붙은 음표의 길이"만큼 늘린다.
+   · 음원 측정: 늘임표마다 실제로 얼마나 늘어났는지 음원의 음 시작점으로 다시 재서, 기본 추정보다
+     확실히 잘 맞을 때만 그 값을 쓴다. (같은 기호여도 연주기가 다르게 늘이는 곳이 있다) */
+const FERMATA_K = 2;
+
+function bpmAt(tempoMap, firstBpm, m) {
+  let bpm = firstBpm;
+  for (let i = 1; i <= m; i++) if (tempoMap[i]) bpm = tempoMap[i];
+  return bpm;
+}
+function fermataExtras(score, bpm) {                    // 기본 추정: {마디: 늘어난 초}
+  const ex = {};
+  (score.fermatas || []).forEach(f => { ex[f.m] = f.dur * (FERMATA_K - 1) * 60 / bpmAt(score.tempo, bpm, f.m); });
+  return ex;
+}
+
+function measureStarts(beats, tempoMap, firstBpm, offset, extra) {
   let bpm = firstBpm, t = offset, out = [];
   for (let m = 1; m <= beats.length; m++) {
     if (tempoMap[m]) bpm = tempoMap[m];
-    out.push(t); t += beats[m - 1] * 60 / bpm;
+    out.push(t); t += beats[m - 1] * 60 / bpm + ((extra && extra[m]) || 0);
   }
   out.push(t);
   return out;
 }
 
-function fitTempo(score, det) {
+function nearDist(det, t) {                             // 가장 가까운 실제 음 시작점과의 차이(초)
+  if (!det.length) return 1;
+  let lo = 0, hi = det.length - 1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (det[mid] < t) lo = mid + 1; else hi = mid; }
+  let best = Math.abs(det[lo] - t);
+  if (lo > 0) best = Math.min(best, Math.abs(det[lo - 1] - t));
+  return best;
+}
+
+/* 악보 위치(박) → 시각(초). 늘임표 음표가 끝난 뒤의 음은 늘어난 만큼 뒤로 민다. */
+function makeTimer(score) {
   const beats = score.beats, cum = [0];
   beats.forEach(b => cum.push(cum[cum.length - 1] + b));
-  const near = t => {                       // 가장 가까운 실제 음 시작점과의 차이
-    let lo = 0, hi = det.length - 1;
-    if (!det.length) return 1;
-    while (lo < hi) { const mid = (lo + hi) >> 1; if (det[mid] < t) lo = mid + 1; else hi = mid; }
-    let best = Math.abs(det[lo] - t);
-    if (lo > 0) best = Math.min(best, Math.abs(det[lo - 1] - t));
-    return best;
+  const fm = {};
+  (score.fermatas || []).forEach(f => { fm[f.m] = f; });
+  const locate = b => {
+    let lo = 0, hi = beats.length - 1;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (cum[mid] <= b) lo = mid; else hi = mid - 1; }
+    return lo;
   };
+  return {
+    cum, locate,
+    at(st, extra, i, b) {                               // st: measureStarts 결과, i: 마디 인덱스(0부터)
+      const ex = extra[i + 1] || 0, pos = b - cum[i], f = fm[i + 1];
+      const nominal = st[i + 1] - st[i] - ex;
+      const after = ex && f && pos >= f.pos + f.dur - 1e-6;
+      return st[i] + pos / beats[i] * nominal + (after ? ex : 0);
+    }
+  };
+}
+
+function fitTempo(score, det, useFermata = true) {
+  const beats = score.beats, tm = makeTimer(score);
+  const loc = score.onsets.map(b => tm.locate(b));
   let best = null;
   for (let bpm = 40; bpm <= 160; bpm += 0.25) {
-    const st = measureStarts(beats, score.tempo, bpm, 0);
+    const ex = useFermata ? fermataExtras(score, bpm) : {};
+    const st = measureStarts(beats, score.tempo, bpm, 0, ex);
     for (let off = 0; off < 0.5; off += 0.02) {
       let sum = 0;
-      for (const b of score.onsets) {
-        let i = 0, lo = 0, hi = beats.length - 1;
-        while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (cum[mid] <= b) lo = mid; else hi = mid - 1; }
-        i = lo;
-        const fr = (b - cum[i]) / beats[i];
-        sum += Math.min(near(st[i] + fr * (st[i + 1] - st[i]) + off), 0.3);
-      }
+      for (let k = 0; k < score.onsets.length; k++)
+        sum += Math.min(nearDist(det, tm.at(st, ex, loc[k], score.onsets[k]) + off), 0.3);
       const sc = sum / score.onsets.length;
       if (!best || sc < best.score) best = { score: sc, bpm, off };
     }
   }
   return best;
+}
+
+/* 늘임표마다 실제 늘어난 시간을 음원에서 잰다. 앞쪽 늘임표부터 차례로(뒤의 값은 앞의 영향을 받으므로).
+   각 늘임표 뒤 ~ 다음 늘임표 앞의 음들이 음원의 음 시작점과 가장 잘 겹치는 값을 찾는다. */
+function refineFermatas(score, det, bpm, off) {
+  const fs = score.fermatas || [];
+  if (!fs.length) return { extras: {}, info: [] };
+  const beats = score.beats, tm = makeTimer(score), cum = tm.cum;
+  const extras = fermataExtras(score, bpm), info = [];
+  fs.forEach((f, j) => {
+    const base = f.dur * 60 / bpmAt(score.tempo, bpm, f.m);       // 음표 하나 길이(초) = 기본 추정치
+    const from = cum[f.m - 1] + f.pos + f.dur, next = fs[j + 1];
+    const to = next ? cum[next.m - 1] + next.pos : Infinity;
+    const seg = score.onsets.filter(b => b >= from - 1e-6 && b < to - 1e-6);
+    const loc = seg.map(b => tm.locate(b));
+    const match = e => {
+      const ex = { ...extras, [f.m]: e }, st = measureStarts(beats, score.tempo, bpm, off, ex);
+      let s = 0;
+      for (let k = 0; k < seg.length; k++) { const d = nearDist(det, tm.at(st, ex, loc[k], seg[k])); s += Math.exp(-(d / 0.04) * (d / 0.04)); }
+      return s / seg.length;
+    };
+    const def = extras[f.m];
+    let pick = def, auto = false;
+    if (seg.length >= 8 && det.length) {
+      const defV = match(def);
+      let bestV = defV, bestE = def;
+      for (let e = 0; e <= base * 2.5 + 0.3; e += 0.01) { const v = match(e); if (v > bestV + 1e-9) { bestV = v; bestE = e; } }
+      // 기본 추정(음표 길이)은 실제 재생음과 잘 맞는 경우가 많다. 다른 파트의 촘촘한 음에 우연히 겹쳐 잘못 고르는 일을
+      // 막으려고, 기본값보다 크게 나을 때만 바꾼다.
+      if (bestV >= 0.25 && bestV > defV + 0.10) { pick = +bestE.toFixed(3); auto = true; }
+    }
+    extras[f.m] = pick;
+    info.push({ m: f.m, dur: f.dur, base: def, extra: pick, auto });
+  });
+  return { extras, info };
 }
 
 /* ───────────────────────── 분석 실행 */
@@ -511,6 +592,7 @@ async function run(fresh) {
       SC = F.score ? await readScore(F.score) : null;
       detOnsets = null;
     }
+    $('ferbox').hidden = !(SC && SC.fermatas && SC.fermatas.length);   // 늘임표가 있는 악보 파일일 때만 선택지를 보인다
     const accId = nfc($('acc').value.trim());
     const order = $('order').value.split(',').map(s => nfc(s.trim())).filter(Boolean).filter(p => p !== accId);
     const missing = order.filter(p => !F.audio[p]);
@@ -531,7 +613,7 @@ async function run(fresh) {
       if (!detOnsets) { prog('음원의 음 시작점을 찾는 중…'); await new Promise(r => setTimeout(r, 20)); detOnsets = onsetTimes(abuf); }
       prog('악보와 음원을 맞춰보는 중…');
       await new Promise(r => setTimeout(r, 20));
-      const fit = fitTempo(SC, detOnsets);
+      const fit = fitTempo(SC, detOnsets, $('fer').value !== 'off');
       if (fit) { bpm = bpm ?? fit.bpm; off = off ?? fit.off; LAY.fit = fit; }
     }
     if (bpm === null) bpm = (SC && SC.tempo[1]) || 120;
@@ -539,11 +621,23 @@ async function run(fresh) {
       if (!detOnsets) { prog('음원의 첫 소리를 찾는 중…'); await new Promise(r => setTimeout(r, 20)); detOnsets = onsetTimes(abuf); }
       off = detOnsets.length ? Math.max(0, detOnsets[0] - 0.03) : 0;
     }
+    let extras = {}, ferInfo = [];                       // 늘임표 보정
+    const ferMode = $('fer').value;
+    if (SC && SC.fermatas && SC.fermatas.length && ferMode !== 'off') {
+      if (ferMode === 'auto') {
+        if (!detOnsets) { prog('음원의 음 시작점을 찾는 중…'); await new Promise(r => setTimeout(r, 20)); detOnsets = onsetTimes(abuf); }
+        prog('늘임표 길이를 재는 중…'); await new Promise(r => setTimeout(r, 20));
+        ({ extras, info: ferInfo } = refineFermatas(SC, detOnsets, bpm, off));
+      } else {
+        extras = fermataExtras(SC, bpm);
+        ferInfo = SC.fermatas.map(f => ({ m: f.m, dur: f.dur, base: extras[f.m], extra: extras[f.m], auto: false }));
+      }
+    }
     ctx.close();
 
     const beats = (SC ? [...SC.beats] : []);
     while (beats.length < meas.length) beats.push(beats.length ? beats[beats.length - 1] : 4);
-    const times = measureStarts(beats.slice(0, meas.length), SC ? SC.tempo : {}, bpm, off).map(t => +t.toFixed(4));
+    const times = measureStarts(beats.slice(0, meas.length), SC ? SC.tempo : {}, bpm, off, extras).map(t => +t.toFixed(4));
     times[times.length - 1] = Math.max(times[times.length - 1], duration);
 
     SONG = {
@@ -566,7 +660,8 @@ async function run(fresh) {
       ['템포', bpm + ' BPM 시작' + (LAY.fit ? ` · 음원 대조 오차 ${LAY.fit.score.toFixed(3)}초`
         : (SC ? ' (직접 지정)' : ' — <b class="warn">악보에 적힌 템포를 입력하고 “다시 계산”을 눌러주세요</b>'
           + '<br><span class="dim">6/8·12/8처럼 점음표 박자면 ♩.= 숫자를 그대로 넣으면 됩니다. MuseScore 파일(.mscz)을 같이 올리면 자동으로 맞춥니다.</span>'))]
-    ].map(r => `<div><span>${r[0]}</span>${r[1]}</div>`).join('');
+    ].concat(ferInfo.length ? [['늘임표', ferInfo.map(f => `${f.m}번 마디 +${f.extra.toFixed(2)}초` + (f.auto ? ' <span class="dim">(음원에서 측정)</span>' : '')).join(' · ')]] : []
+    ).map(r => `<div><span>${r[0]}</span>${r[1]}</div>`).join('');
     drawPreview();
     window.__dbg = { LAY, SONG, SC, PAGES };
     prog('완료');
