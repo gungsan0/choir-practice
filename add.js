@@ -188,8 +188,24 @@ function staffLines({ bin, W, H }) {
    우연히 여러 오선에서 같은 x에 음표 기둥·기호가 걸리면 마디선으로 잘못 인식했다.
    그래서 단 전체 높이를 한 번에 검사해, 실제로 위에서 아래까지 이어진 세로줄만 인정한다. */
 function barlineCols(pd, sysv) {
+  return barlineColsIn(pd, sysv[0][0], sysv[sysv.length - 1][4], sysv[0][4] - sysv[0][0]);
+}
+
+/* 파트(오선)마다 마디선이 따로 그어져 오선 사이가 끊긴 악보용 보강.
+   위의 방식으로는 단 맨 앞 괄호 하나만 잡혀 마디선이 없다고 나오므로, 그때만 쓴다.
+   오선 하나하나에서 마디선 열을 찾고, 단의 모든 오선에서 같은 x에 있는 것만 인정한다. */
+function barlineColsPerStaff(pd, sysv) {
+  const { W } = pd, h = sysv[0][4] - sysv[0][0];
+  const out = new Uint8Array(W).fill(1);
+  for (const st of sysv) {
+    const c = barlineColsIn(pd, st[0], st[4], h);
+    for (let x = 0; x < W; x++) out[x] &= c[x];
+  }
+  return out;
+}
+
+function barlineColsIn(pd, top, bot, h) {
   const { bin, W } = pd;
-  const top = sysv[0][0], bot = sysv[sysv.length - 1][4];
   const need = bot - top + 1;
   const dens = new Float32Array(W), out = new Uint8Array(W);
   for (let x = 0; x < W; x++) {
@@ -199,7 +215,6 @@ function barlineCols(pd, sysv) {
   }
   // 오선 높이를 꽉 채우면서 양옆이 (오선줄 말고는) 비어 있는 열만 마디선으로 본다.
   // 12/8 같은 박자표·음표 기둥은 옆이 두꺼워서 걸러진다.
-  const h = sysv[0][4] - sysv[0][0];
   const gap = Math.max(3, Math.round(h / 9));
   // 겹세로줄(더블 바라인 — 박자표가 바뀌는 자리 등)은 아주 가느다란 두 줄이 3~4px
   // 간격으로 붙어 있다. 그 좁은 빈 칸 때문에 두 줄 다 "옆이 안 비었다"며 걸러지던
@@ -223,7 +238,8 @@ function barlineCols(pd, sysv) {
       if (found < 0) break;
       r = found;
     }
-    if (r - l > Math.max(6, h / 4)) { out[x] = 0; continue; }   // 너무 두꺼운 덩어리
+    // 너무 두꺼운 덩어리는 제외. 종지선(가는 선+굵은 선)은 합쳐서 오선 높이의 0.3배쯤 되므로 넉넉히 허용한다.
+    if (r - l > Math.max(6, h * 0.4)) { out[x] = 0; continue; }
     const L = dens[Math.max(0, l - gap)], R = dens[Math.min(W - 1, r + gap)];
     out[x] = (L <= .4 && R <= .4) ? 1 : 0;
   }
@@ -334,7 +350,8 @@ function analyzeLayout(pages, expect, forceK) {
     for (const p of data) {
       const ps = [];
       for (const sysv of groupSystems(p.pd, p.staves, k)) {
-        const bars = barsOf(barlineCols(p.pd, sysv), p.pd.W);
+        let bars = barsOf(barlineCols(p.pd, sysv), p.pd.W);
+        if (bars.length < 2) bars = barsOf(barlineColsPerStaff(p.pd, sysv), p.pd.W);   // 오선마다 따로 그어진 마디선
         if (bars.length < 2) return null;
         total += bars.length - 1;
         ps.push({ staves: sysv.map(s => [s[0], s[4]]), bars });
