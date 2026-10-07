@@ -132,7 +132,8 @@
   }
   async function getAsset(url) {
     const cands = forms(url);
-    for (const u of cands) { try { const r = await fetch(u); if (r && r.ok) return r; } catch (e) { } }
+    const opt = /song\.json$/.test(url) ? { cache: 'no-cache' } : undefined;   // 마디 시각은 늘 최신으로(HTTP 캐시 10분 방지)
+    for (const u of cands) { try { const r = await fetch(u, opt); if (r && r.ok) return r; } catch (e) { } }
     for (const u of cands) {
       try {
         const hit = await caches.match(abs(u));

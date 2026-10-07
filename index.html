@@ -88,7 +88,7 @@ let ready=false;
 function paintNote(){
   document.getElementById('note').innerHTML =
     (owner ? T('note.owner') : T('note.guest')) + T('note.common') +
-    ' <span style="opacity:.7">'+T('note.version',{v:'2026.10.08-a'})+'</span> · <a href="#" id="hard" style="text-decoration:underline">'+T('note.reload')+'</a>' +
+    ' <span style="opacity:.7">'+T('note.version',{v:'2026.10.08-b'})+'</span> · <a href="#" id="hard" style="text-decoration:underline">'+T('note.reload')+'</a>' +
     (owner ? '' : ' · <a href="add.html" style="opacity:.55">'+T('note.admin')+'</a>');
   document.getElementById('hard').onclick = async e => {
     e.preventDefault();

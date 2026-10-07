@@ -1,5 +1,5 @@
 /* 울림 합창 연습실 — 오프라인 지원 */
-const SHELL = 'shell-2026.10.08-a';
+const SHELL = 'shell-2026.10.08-b';
 const FILES = ['./', 'index.html', 'player.html', 'player.js', 'i18n.js', 'app.css',
   'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable.png', 'logo-badge.png',
   'add.html', 'add.js', 'vendor/fflate.min.js', 'vendor/pdf.min.mjs', 'vendor/pdf.worker.min.mjs'];
@@ -63,7 +63,7 @@ self.addEventListener('fetch', e => {
   // 곡 목록과 곡 정보는 최신을 먼저 시도(새 곡·고친 악보가 바로 보이도록), 실패하면 캐시
   if (url.pathname.endsWith('songs/index.json') || url.pathname.endsWith('song.json')) {
     e.respondWith(
-      fetch(req).then(r => {
+      fetch(req, { cache: 'no-cache' }).then(r => {
         if (!r || r.status !== 200)                     // 404 응답을 캐시에 덮어쓰지 않는다
           return caches.match(req).then(hit => hit || r);
         const cp = r.clone();
@@ -80,7 +80,7 @@ self.addEventListener('fetch', e => {
   //  (실패하면 캐시로 넘어가므로 오프라인에서도 그대로 열립니다)
   if (!isSong) {
     e.respondWith(
-      fetch(req).then(r => {
+      fetch(req, { cache: 'no-cache' }).then(r => {
         if (r && r.status === 200) {
           const cp = r.clone();
           caches.open(SHELL).then(c => c.put(req, cp)).catch(() => { });
